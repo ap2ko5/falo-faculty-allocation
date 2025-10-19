@@ -1,152 +1,132 @@
--- FALO Database Setup Script
--- Run this entire script in your Supabase SQL Editor
+-- FALO Database Setup for Supabase
+-- Copy this entire script and run in Supabase SQL Editor
 
--- Drop existing tables if they exist (optional, for fresh setup)
-DROP TABLE IF EXISTS queries CASCADE;
-DROP TABLE IF EXISTS timetable CASCADE;
-DROP TABLE IF EXISTS allocations CASCADE;
-DROP TABLE IF EXISTS courses CASCADE;
-DROP TABLE IF EXISTS classes CASCADE;
-DROP TABLE IF EXISTS faculty CASCADE;
-DROP TABLE IF EXISTS admins CASCADE;
-DROP TABLE IF EXISTS departments CASCADE;
+DROP TABLE IF EXISTS Students CASCADE;
+DROP TABLE IF EXISTS Admins CASCADE;
+DROP TABLE IF EXISTS Timetable CASCADE;
+DROP TABLE IF EXISTS Allocations CASCADE;
+DROP TABLE IF EXISTS AllocationWindow CASCADE;
+DROP TABLE IF EXISTS Courses CASCADE;
+DROP TABLE IF EXISTS Classes CASCADE;
+DROP TABLE IF EXISTS Faculty CASCADE;
+DROP TABLE IF EXISTS Departments CASCADE;
 
--- Create Departments table
-CREATE TABLE departments (
-  id serial primary key,
-  departmentname varchar(100),
-  hod varchar(100)
+CREATE TABLE Departments (
+    DID SERIAL PRIMARY KEY,
+    Department_name VARCHAR(100) NOT NULL,
+    HOD INT
 );
 
--- Create Faculty table
-CREATE TABLE faculty (
-  id serial primary key,
-  facultyname varchar(100),
-  department_id integer references departments(id),
-  designation varchar(100),
-  password varchar(100)
+CREATE TABLE Faculty (
+    FID SERIAL PRIMARY KEY,
+    Faculty_name VARCHAR(100) NOT NULL,
+    DID INT REFERENCES Departments(DID) ON DELETE CASCADE,
+    Designation VARCHAR(50),
+    Password VARCHAR(100) NOT NULL
 );
 
--- Create Classes table
-CREATE TABLE classes (
-  id serial primary key,
-  semester integer,
-  section varchar(50),
-  department_id integer references departments(id)
+CREATE TABLE Classes (
+    ClID SERIAL PRIMARY KEY,
+    Semester INT NOT NULL,
+    Section VARCHAR(10) NOT NULL,
+    DID INT REFERENCES Departments(DID) ON DELETE CASCADE
 );
 
--- Create Courses table
-CREATE TABLE courses (
-  id serial primary key,
-  coursename varchar(100),
-  department_id integer references departments(id)
+CREATE TABLE Courses (
+    CID SERIAL PRIMARY KEY,
+    Course_name VARCHAR(100) NOT NULL,
+    DID INT REFERENCES Departments(DID) ON DELETE CASCADE
 );
 
--- Create Allocations table
-CREATE TABLE allocations (
-  id serial primary key,
-  faculty_id integer references faculty(id),
-  class_id integer references classes(id),
-  course_id integer references courses(id),
-  status varchar(50)
+CREATE TABLE Allocations (
+    AllocID SERIAL PRIMARY KEY,
+    FID INT REFERENCES Faculty(FID) ON DELETE CASCADE,
+    ClID INT REFERENCES Classes(ClID) ON DELETE CASCADE,
+    CID INT REFERENCES Courses(CID) ON DELETE CASCADE,
+    Status VARCHAR(20) DEFAULT 'Pending',
+    UNIQUE (FID, ClID, CID)
 );
 
--- Create Timetable table
-CREATE TABLE timetable (
-  id serial primary key,
-  class_id integer references classes(id),
-  day varchar(20),
-  period integer,
-  course_id integer references courses(id),
-  faculty_id integer references faculty(id)
+CREATE TABLE Timetable (
+    TTID SERIAL PRIMARY KEY,
+    ClID INT REFERENCES Classes(ClID) ON DELETE CASCADE,
+    Day VARCHAR(10) CHECK (Day IN ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')),
+    Period INT CHECK (Period BETWEEN 1 AND 7),
+    CID INT REFERENCES Courses(CID) ON DELETE CASCADE,
+    FID INT REFERENCES Faculty(FID) ON DELETE CASCADE,
+    UNIQUE (ClID, Day, Period),
+    UNIQUE (FID, Day, Period)
 );
 
--- Create Admins table
-CREATE TABLE admins (
-  id serial primary key,
-  username varchar(100),
-  password varchar(100)
+CREATE TABLE Admins (
+    AID SERIAL PRIMARY KEY,
+    FID INT REFERENCES Faculty(FID) ON DELETE CASCADE,
+    DID INT REFERENCES Departments(DID) ON DELETE CASCADE,
+    Username VARCHAR(50) UNIQUE NOT NULL,
+    Password VARCHAR(100) NOT NULL
 );
 
--- Create Queries table
-CREATE TABLE queries (
-  id serial primary key,
-  faculty_id integer references faculty(id),
-  faculty_name varchar(100),
-  subject varchar(200),
-  message text,
-  status varchar(50) default 'pending',
-  created_at timestamp default now()
+CREATE TABLE Students (
+    SID SERIAL PRIMARY KEY,
+    Student_name VARCHAR(100) NOT NULL,
+    ClID INT REFERENCES Classes(ClID) ON DELETE CASCADE
 );
 
--- Insert Sample Data
+CREATE TABLE AllocationWindow (
+    WindowID SERIAL PRIMARY KEY,
+    StartTime TIMESTAMP NOT NULL,
+    EndTime TIMESTAMP NOT NULL,
+    IsClosed BOOLEAN DEFAULT FALSE
+);
 
--- Departments
-INSERT INTO departments (departmentname, hod) VALUES 
-('Computer Science', 'Dr. Smith'),
-('Electronics', 'Dr. Johnson'),
-('Mechanical', 'Dr. Williams');
+CREATE OR REPLACE FUNCTION auto_allocate_unassigned()
+RETURNS void AS $$
+DECLARE
+    unalloc RECORD;
+    random_faculty INT;
+BEGIN
+    FOR unalloc IN
+        SELECT ClID, CID
+        FROM Courses c
+        JOIN Classes cl ON c.DID = cl.DID
+        WHERE (ClID, CID) NOT IN (SELECT ClID, CID FROM Allocations)
+    LOOP
+        SELECT FID INTO random_faculty
+        FROM Faculty
+        WHERE DID = (SELECT DID FROM Classes WHERE ClID = unalloc.ClID)
+        ORDER BY RANDOM()
+        LIMIT 1;
+        IF random_faculty IS NOT NULL THEN
+            INSERT INTO Allocations (FID, ClID, CID, Status)
+            VALUES (random_faculty, unalloc.ClID, unalloc.CID, 'Auto-Allocated');
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
 
--- Faculty
-INSERT INTO faculty (facultyname, department_id, designation, password) VALUES 
-('John Doe', 1, 'Professor', 'password123'),
-('Jane Smith', 1, 'Assistant Professor', 'password123'),
-('Robert Brown', 2, 'Associate Professor', 'password123'),
-('Emily Davis', 3, 'Professor', 'password123');
+CREATE OR REPLACE FUNCTION trigger_auto_allocation()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.IsClosed = TRUE THEN
+        PERFORM auto_allocate_unassigned();
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
--- Classes
-INSERT INTO classes (semester, section, department_id) VALUES 
-(5, 'CS-A', 1),
-(5, 'CS-B', 1),
-(6, 'EC-A', 2),
-(7, 'ME-A', 3);
+CREATE TRIGGER trg_auto_allocation
+AFTER UPDATE OF IsClosed ON AllocationWindow
+FOR EACH ROW
+WHEN (NEW.IsClosed = TRUE)
+EXECUTE FUNCTION trigger_auto_allocation();
 
--- Courses
-INSERT INTO courses (coursename, department_id) VALUES 
-('Database Management Systems', 1),
-('Operating Systems', 1),
-('Computer Networks', 1),
-('Digital Electronics', 2),
-('Control Systems', 2),
-('Thermodynamics', 3),
-('Machine Design', 3);
-
--- Admins
-INSERT INTO admins (username, password) VALUES 
-('admin', 'admin123'),
-('hod', 'hod123');
-
--- Sample Allocations
-INSERT INTO allocations (faculty_id, class_id, course_id, status) VALUES 
-(1, 1, 1, 'allocated'),
-(2, 1, 2, 'allocated'),
-(1, 2, 1, 'allocated');
-
--- Sample Timetable
-INSERT INTO timetable (class_id, day, period, course_id, faculty_id) VALUES 
-(1, 'Monday', 1, 1, 1),
-(1, 'Monday', 2, 2, 2),
-(1, 'Tuesday', 1, 1, 1),
-(2, 'Wednesday', 1, 1, 1);
-
--- Sample Queries
-INSERT INTO queries (faculty_id, faculty_name, subject, message, status) VALUES 
-(1, 'John Doe', 'Classroom Request', 'Need projector for Database class', 'pending'),
-(2, 'Jane Smith', 'Schedule Conflict', 'Two classes scheduled at same time', 'resolved');
-
--- Verification queries
-SELECT 'Departments' as table_name, COUNT(*) as count FROM departments
-UNION ALL
-SELECT 'Faculty', COUNT(*) FROM faculty
-UNION ALL
-SELECT 'Classes', COUNT(*) FROM classes
-UNION ALL
-SELECT 'Courses', COUNT(*) FROM courses
-UNION ALL
-SELECT 'Allocations', COUNT(*) FROM allocations
-UNION ALL
-SELECT 'Timetable', COUNT(*) FROM timetable
-UNION ALL
-SELECT 'Admins', COUNT(*) FROM admins
-UNION ALL
-SELECT 'Queries', COUNT(*) FROM queries;
+INSERT INTO Departments VALUES (1, 'Computer Science', NULL), (2, 'Electronics', NULL), (3, 'Mechanical', NULL);
+INSERT INTO Faculty VALUES (1, 'Dr. John Smith', 1, 'Professor', 'password123'), (2, 'Dr. Jane Doe', 1, 'Associate Professor', 'password123'), (3, 'Dr. Robert Brown', 2, 'Assistant Professor', 'password123'), (4, 'Dr. Emily Davis', 3, 'Professor', 'password123'), (5, 'Dr. Michael Wilson', 1, 'Assistant Professor', 'password123');
+UPDATE Departments SET HOD = 1 WHERE DID = 1;
+UPDATE Departments SET HOD = 3 WHERE DID = 2;
+UPDATE Departments SET HOD = 4 WHERE DID = 3;
+INSERT INTO Classes VALUES (1, 5, 'A', 1), (2, 5, 'B', 1), (3, 6, 'A', 2), (4, 7, 'A', 3);
+INSERT INTO Courses VALUES (1, 'Database Management Systems', 1), (2, 'Operating Systems', 1), (3, 'Computer Networks', 1), (4, 'Digital Electronics', 2), (5, 'Thermodynamics', 3);
+INSERT INTO Admins VALUES (1, 1, 1, 'admin', 'admin123');
+INSERT INTO Students VALUES (1, 'Alice Johnson', 1), (2, 'Bob Smith', 1);
+INSERT INTO AllocationWindow VALUES (1, NOW(), NOW() + INTERVAL '7 days', FALSE);
