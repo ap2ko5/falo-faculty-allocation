@@ -4,12 +4,25 @@ const facultyController = {
   // Get all faculty
   getAll: async (req, res) => {
     try {
-      const { rows } = await db.query(
-        `SELECT f.*, d.name as department_name 
-         FROM faculty f 
-         LEFT JOIN departments d ON f.department_id = d.id`
-      );
-      res.json(rows);
+      const { data: faculty, error } = await supabase
+        .from('faculty')
+        .select(`
+          *,
+          departments (
+            name
+          )
+        `);
+
+      if (error) {
+        throw error;
+      }
+
+      const formattedFaculty = faculty.map(f => ({
+        ...f,
+        department_name: f.departments?.name
+      }));
+
+      res.json(formattedFaculty);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -18,19 +31,27 @@ const facultyController = {
   // Get faculty by ID
   getById: async (req, res) => {
     try {
-      const { rows } = await db.query(
-        `SELECT f.*, d.name as department_name 
-         FROM faculty f 
-         LEFT JOIN departments d ON f.department_id = d.id 
-         WHERE f.id = $1`,
-        [req.params.id]
-      );
+      const { data: faculty, error } = await supabase
+        .from('faculty')
+        .select(`
+          *,
+          departments (
+            name
+          )
+        `)
+        .eq('id', req.params.id)
+        .single();
 
-      if (rows.length === 0) {
+      if (error || !faculty) {
         return res.status(404).json({ error: 'Faculty not found' });
       }
 
-      res.json(rows[0]);
+      const formattedFaculty = {
+        ...faculty,
+        department_name: faculty.departments?.name
+      };
+
+      res.json(formattedFaculty);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -42,24 +63,36 @@ const facultyController = {
       const { name, email, password, department_id, role, designation, expertise, preferences } = req.body;
       
       // Check if email already exists
-      const { rows: existingUser } = await db.query(
-        'SELECT id FROM faculty WHERE email = $1',
-        [email]
-      );
+      const { data: existingUser } = await supabase
+        .from('faculty')
+        .select('id')
+        .eq('email', email)
+        .single();
 
-      if (existingUser.length > 0) {
+      if (existingUser) {
         return res.status(400).json({ error: 'Email already registered' });
       }
 
-      const { rows } = await db.query(
-        `INSERT INTO faculty 
-         (name, email, password, department_id, role, designation, expertise, preferences) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-         RETURNING *`,
-        [name, email, password, department_id, role || 'faculty', designation, expertise, preferences]
-      );
+      const { data: faculty, error } = await supabase
+        .from('faculty')
+        .insert([{
+          name,
+          email,
+          password,
+          department_id,
+          role: role || 'faculty',
+          designation,
+          expertise,
+          preferences
+        }])
+        .select()
+        .single();
 
-      res.status(201).json(rows[0]);
+      if (error) {
+        throw error;
+      }
+
+      res.status(201).json(faculty);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -72,36 +105,40 @@ const facultyController = {
 
       // Check if updating email to one that already exists
       if (email) {
-        const { rows: existingUser } = await db.query(
-          'SELECT id FROM faculty WHERE email = $1 AND id != $2',
-          [email, req.params.id]
-        );
+        const { data: existingUser } = await supabase
+          .from('faculty')
+          .select('id')
+          .eq('email', email)
+          .neq('id', req.params.id)
+          .single();
 
-        if (existingUser.length > 0) {
+        if (existingUser) {
           return res.status(400).json({ error: 'Email already in use' });
         }
       }
 
-      const { rows } = await db.query(
-        `UPDATE faculty 
-         SET name = COALESCE($1, name),
-             email = COALESCE($2, email),
-             password = COALESCE($3, password),
-             department_id = COALESCE($4, department_id),
-             role = COALESCE($5, role),
-             designation = COALESCE($6, designation),
-             expertise = COALESCE($7, expertise),
-             preferences = COALESCE($8, preferences)
-         WHERE id = $9 
-         RETURNING *`,
-        [name, email, password, department_id, role, designation, expertise, preferences, req.params.id]
-      );
+      const updateData = {};
+      if (name) updateData.name = name;
+      if (email) updateData.email = email;
+      if (password) updateData.password = password;
+      if (department_id) updateData.department_id = department_id;
+      if (role) updateData.role = role;
+      if (designation) updateData.designation = designation;
+      if (expertise) updateData.expertise = expertise;
+      if (preferences) updateData.preferences = preferences;
 
-      if (rows.length === 0) {
+      const { data: faculty, error } = await supabase
+        .from('faculty')
+        .update(updateData)
+        .eq('id', req.params.id)
+        .select()
+        .single();
+
+      if (error || !faculty) {
         return res.status(404).json({ error: 'Faculty not found' });
       }
 
-      res.json(rows[0]);
+      res.json(faculty);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -110,12 +147,14 @@ const facultyController = {
   // Delete faculty
   delete: async (req, res) => {
     try {
-      const { rows } = await db.query(
-        'DELETE FROM faculty WHERE id = $1 RETURNING id',
-        [req.params.id]
-      );
+      const { data, error } = await supabase
+        .from('faculty')
+        .delete()
+        .eq('id', req.params.id)
+        .select()
+        .single();
 
-      if (rows.length === 0) {
+      if (error || !data) {
         return res.status(404).json({ error: 'Faculty not found' });
       }
 
@@ -128,23 +167,45 @@ const facultyController = {
   // Get faculty workload
   getWorkload: async (req, res) => {
     try {
-      const { rows } = await db.query(
-        `SELECT f.id, f.name, f.designation,
-                COUNT(DISTINCT a.id) as total_courses,
-                SUM(c.credits) as total_credits
-         FROM faculty f
-         LEFT JOIN allocations a ON f.id = a.faculty_id
-         LEFT JOIN courses c ON a.course_id = c.id
-         WHERE f.id = $1
-         GROUP BY f.id, f.name, f.designation`,
-        [req.params.id]
-      );
+      // First, get the faculty details
+      const { data: faculty, error: facultyError } = await supabase
+        .from('faculty')
+        .select('id, name, designation')
+        .eq('id', req.params.id)
+        .single();
 
-      if (rows.length === 0) {
+      if (facultyError || !faculty) {
         return res.status(404).json({ error: 'Faculty not found' });
       }
 
-      res.json(rows[0]);
+      // Then get the allocations with course details
+      const { data: allocations, error: allocationsError } = await supabase
+        .from('allocations')
+        .select(`
+          id,
+          courses (
+            credits
+          )
+        `)
+        .eq('faculty_id', req.params.id);
+
+      if (allocationsError) {
+        throw allocationsError;
+      }
+
+      // Calculate workload
+      const totalCourses = allocations.length;
+      const totalCredits = allocations.reduce((sum, allocation) => {
+        return sum + (allocation.courses?.credits || 0);
+      }, 0);
+
+      res.json({
+        id: faculty.id,
+        name: faculty.name,
+        designation: faculty.designation,
+        total_courses: totalCourses,
+        total_credits: totalCredits
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

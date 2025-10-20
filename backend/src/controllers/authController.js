@@ -8,19 +8,21 @@ const authController = {
       const { email, password } = req.body;
       
       // Get faculty details with department name
-      const { rows } = await db.query(
-        `SELECT f.*, d.name as department_name 
-         FROM faculty f 
-         LEFT JOIN departments d ON f.department_id = d.id
-         WHERE f.email = $1 AND f.password = $2`,
-        [email, password]
-      );
+      const { data: faculty, error } = await supabase
+        .from('faculty')
+        .select(`
+          *,
+          departments (
+            name
+          )
+        `)
+        .eq('email', email)
+        .eq('password', password)
+        .single();
 
-      if (rows.length === 0) {
+      if (error || !faculty) {
         return res.status(401).json({ error: 'Invalid credentials' });
       }
-
-      const faculty = rows[0];
       
       const token = jwt.sign(
         { 
@@ -40,7 +42,7 @@ const authController = {
           email: faculty.email,
           role: faculty.role,
           department: faculty.department_id,
-          departmentName: faculty.department_name,
+          departmentName: faculty.departments?.name,
           name: faculty.name
         }
       });
@@ -54,25 +56,35 @@ const authController = {
       const { name, email, password, department_id, role, designation, expertise, preferences } = req.body;
       
       // Check if email already exists
-      const { rows: existingUser } = await db.query(
-        'SELECT id FROM faculty WHERE email = $1',
-        [email]
-      );
+      const { data: existingUser, error: checkError } = await supabase
+        .from('faculty')
+        .select('id')
+        .eq('email', email)
+        .single();
 
-      if (existingUser.length > 0) {
+      if (existingUser) {
         return res.status(400).json({ error: 'Email already registered' });
       }
 
       // Insert new faculty
-      const { rows } = await db.query(
-        `INSERT INTO faculty 
-         (name, email, password, department_id, role, designation, expertise, preferences) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING *`,
-        [name, email, password, department_id, role || 'faculty', designation, expertise, preferences]
-      );
+      const { data: faculty, error: insertError } = await supabase
+        .from('faculty')
+        .insert([{
+          name,
+          email,
+          password,
+          department_id,
+          role: role || 'faculty',
+          designation,
+          expertise,
+          preferences
+        }])
+        .select()
+        .single();
 
-      const faculty = rows[0];
+      if (insertError) {
+        return res.status(500).json({ error: insertError.message });
+      }
       
       const token = jwt.sign(
         { 
@@ -104,26 +116,27 @@ const authController = {
     try {
       const { userId } = req.user;
       
-      const { rows } = await db.query(
-        `SELECT f.*, d.name as department_name 
-         FROM faculty f 
-         LEFT JOIN departments d ON f.department_id = d.id
-         WHERE f.id = $1`,
-        [userId]
-      );
+      const { data: faculty, error } = await supabase
+        .from('faculty')
+        .select(`
+          *,
+          departments (
+            name
+          )
+        `)
+        .eq('id', userId)
+        .single();
 
-      if (rows.length === 0) {
+      if (error || !faculty) {
         return res.status(404).json({ error: 'User not found' });
       }
-
-      const faculty = rows[0];
 
       res.json({
         id: faculty.id,
         email: faculty.email,
         role: faculty.role,
         department: faculty.department_id,
-        departmentName: faculty.department_name,
+        departmentName: faculty.departments?.name,
         name: faculty.name,
         designation: faculty.designation,
         expertise: faculty.expertise,

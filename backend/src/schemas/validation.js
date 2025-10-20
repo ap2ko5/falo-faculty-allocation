@@ -2,7 +2,7 @@ import Joi from 'joi';
 
 // Auth schemas
 export const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string().required(), // Changed from email() to string() to allow usernames
   password: Joi.string().required()
 });
 
