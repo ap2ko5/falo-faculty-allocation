@@ -30,6 +30,21 @@ This project contains a complete faculty allocation system featuring:
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+- **Git**: Required to clone the repository
+  - **Windows users**: If you need help setting up Git, see [WINDOWS_GIT_SETUP.md](WINDOWS_GIT_SETUP.md)
+  - Download Git: https://git-scm.com/download
+- **Node.js**: v14 or higher (includes npm)
+- **Supabase Account**: Free tier available at https://supabase.com
+
+### 0. Clone the Repository
+
+```bash
+git clone https://github.com/ap2ko5/falo-faculty-allocation.git
+cd falo-faculty-allocation
+```
+
 ### 1. Database Setup (Supabase)
 1. Go to https://supabase.com
 2. Create new project
@@ -148,11 +163,12 @@ background: linear-gradient(140deg, #a8edea 0%, #fed6e3 100%);
 ## 🐛 Troubleshooting
 
 Common solutions:
-1. Port conflicts: Check .env files
-2. Database connection: Verify Supabase credentials
-3. Authentication issues: Check JWT configuration
-4. UI not updating: Clear browser cache
-5. Loading issues: Check network connectivity
+1. **Git issues on Windows**: See [WINDOWS_GIT_SETUP.md](WINDOWS_GIT_SETUP.md) for detailed Git PATH setup
+2. Port conflicts: Check .env files
+3. Database connection: Verify Supabase credentials
+4. Authentication issues: Check JWT configuration
+5. UI not updating: Clear browser cache
+6. Loading issues: Check network connectivity
 
 ## 📄 License
 
