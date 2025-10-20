@@ -18,11 +18,10 @@ import { authService } from '../services/api';
 export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
     confirmPassword: '',
     role: 'faculty',
-    name: '',
   });
   const [error, setError] = useState('');
 
@@ -55,23 +54,12 @@ export default function Register() {
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
-              label="Full Name"
+              label="Username"
               margin="normal"
               required
-              value={formData.name}
+              value={formData.username}
               onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-            />
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              margin="normal"
-              required
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
+                setFormData({ ...formData, username: e.target.value })
               }
             />
             <FormControl fullWidth margin="normal">

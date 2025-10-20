@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, Box } from '@mui/material';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import { theme } from './theme';
 import './App.css';
 
 // Components
 import Navbar from './components/Navbar';
+import AdminDashboard from './components/admin/AdminDashboard';
+import FacultyDashboard from './components/faculty/FacultyDashboard';
+import WindowsManager from './components/admin/WindowsManager';
 
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
 import Allocations from './pages/Allocations';
 import Timetable from './pages/Timetable';
 
@@ -67,9 +69,23 @@ function App() {
                   path="/dashboard"
                   element={
                     isLoggedIn ? (
-                      <Dashboard />
+                      user?.role === 'admin' ? (
+                        <AdminDashboard onLogout={handleLogout} user={user} />
+                      ) : (
+                        <FacultyDashboard onLogout={handleLogout} user={user} />
+                      )
                     ) : (
                       <Navigate to="/login" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/windows"
+                  element={
+                    isLoggedIn && user?.role === 'admin' ? (
+                      <WindowsManager />
+                    ) : (
+                      <Navigate to="/dashboard" replace />
                     )
                   }
                 />

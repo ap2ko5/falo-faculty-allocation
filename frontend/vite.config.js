@@ -7,7 +7,11 @@ export default defineConfig({
     port: 3000,
     host: true,
     proxy: {
-      '/api': 'http://localhost:5002'
+      '/api': {
+        target: 'http://localhost:5005',
+        changeOrigin: true,
+        secure: false
+      }
     }
   }
 })

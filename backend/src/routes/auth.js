@@ -1,11 +1,26 @@
 import express from 'express';
-import { authController } from '../controllers/authController.js';
+import authController from '../controllers/authController.js';
+import { validateBody } from '../middleware/validation.js';
+import { loginSchema, registerSchema } from '../schemas/validation.js';
+import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/login', authController.login);
-router.post('/register', authController.register);
-router.post('/logout', authController.logout);
-router.get('/verify', authController.verify);
+// Public routes
+router.post('/login',
+  validateBody(loginSchema),
+  authController.login
+);
+
+router.post('/register',
+  validateBody(registerSchema),
+  authController.register
+);
+
+// Protected routes
+router.get('/profile',
+  verifyToken,
+  authController.profile
+);
 
 export default router;

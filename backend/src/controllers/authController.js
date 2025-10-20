@@ -2,70 +2,137 @@ import { supabase } from '../config/database.js';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/database.js';
 
-export const authController = {
+const authController = {
   login: async (req, res) => {
     try {
       const { email, password } = req.body;
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
       
-      if (error) throw error;
+      // Get faculty details with department name
+      const { rows } = await db.query(
+        `SELECT f.*, d.name as department_name 
+         FROM faculty f 
+         LEFT JOIN departments d ON f.department_id = d.id
+         WHERE f.email = $1 AND f.password = $2`,
+        [email, password]
+      );
 
+      if (rows.length === 0) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      const faculty = rows[0];
+      
       const token = jwt.sign(
-        { userId: data.user.id, email: data.user.email },
+        { 
+          userId: faculty.id,
+          email: faculty.email,
+          role: faculty.role,
+          department: faculty.department_id
+        },
         config.jwtSecret,
         { expiresIn: '24h' }
       );
 
-      res.json({ token, user: data.user });
-    } catch (err) {
-      res.status(401).json({ error: err.message });
-    }
-  },
-
-  register: async (req, res) => {
-    try {
-      const { email, password, role } = req.body;
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            role,
-          },
-        },
+      return res.json({
+        token,
+        user: {
+          id: faculty.id,
+          email: faculty.email,
+          role: faculty.role,
+          department: faculty.department_id,
+          departmentName: faculty.department_name,
+          name: faculty.name
+        }
       });
-      
-      if (error) throw error;
-      res.json({ message: 'Registration successful', user: data.user });
-    } catch (err) {
-      res.status(400).json({ error: err.message });
-    }
-  },
-
-  logout: async (req, res) => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      res.json({ message: 'Logged out successfully' });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   },
 
-  verify: async (req, res) => {
+  register: async (req, res) => {
     try {
-      const token = req.headers.authorization?.split(' ')[1];
-      if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
+      const { name, email, password, department_id, role, designation, expertise, preferences } = req.body;
+      
+      // Check if email already exists
+      const { rows: existingUser } = await db.query(
+        'SELECT id FROM faculty WHERE email = $1',
+        [email]
+      );
+
+      if (existingUser.length > 0) {
+        return res.status(400).json({ error: 'Email already registered' });
       }
 
-      const decoded = jwt.verify(token, config.jwtSecret);
-      res.json({ user: decoded });
+      // Insert new faculty
+      const { rows } = await db.query(
+        `INSERT INTO faculty 
+         (name, email, password, department_id, role, designation, expertise, preferences) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING *`,
+        [name, email, password, department_id, role || 'faculty', designation, expertise, preferences]
+      );
+
+      const faculty = rows[0];
+      
+      const token = jwt.sign(
+        { 
+          userId: faculty.id,
+          email: faculty.email,
+          role: faculty.role,
+          department: faculty.department_id
+        },
+        config.jwtSecret,
+        { expiresIn: '24h' }
+      );
+
+      res.json({
+        token,
+        user: {
+          id: faculty.id,
+          email: faculty.email,
+          role: faculty.role,
+          department: faculty.department_id,
+          name: faculty.name
+        }
+      });
     } catch (err) {
-      res.status(401).json({ error: 'Invalid token' });
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  profile: async (req, res) => {
+    try {
+      const { userId } = req.user;
+      
+      const { rows } = await db.query(
+        `SELECT f.*, d.name as department_name 
+         FROM faculty f 
+         LEFT JOIN departments d ON f.department_id = d.id
+         WHERE f.id = $1`,
+        [userId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const faculty = rows[0];
+
+      res.json({
+        id: faculty.id,
+        email: faculty.email,
+        role: faculty.role,
+        department: faculty.department_id,
+        departmentName: faculty.department_name,
+        name: faculty.name,
+        designation: faculty.designation,
+        expertise: faculty.expertise,
+        preferences: faculty.preferences
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   }
 };
+
+export default authController;

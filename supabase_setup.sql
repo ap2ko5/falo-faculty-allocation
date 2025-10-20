@@ -1,28 +1,30 @@
 -- FALO Database Setup for Supabase
--- Copy this entire script and run in Supabase SQL Editor
 
-DROP TABLE IF EXISTS Students CASCADE;
-DROP TABLE IF EXISTS Admins CASCADE;
-DROP TABLE IF EXISTS Timetable CASCADE;
-DROP TABLE IF EXISTS Allocations CASCADE;
-DROP TABLE IF EXISTS AllocationWindow CASCADE;
-DROP TABLE IF EXISTS Courses CASCADE;
-DROP TABLE IF EXISTS Classes CASCADE;
-DROP TABLE IF EXISTS Faculty CASCADE;
-DROP TABLE IF EXISTS Departments CASCADE;
+-- Enable Row Level Security (RLS)
+ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.faculty ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.allocations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.timetable ENABLE ROW LEVEL SECURITY;
 
-CREATE TABLE Departments (
-    DID SERIAL PRIMARY KEY,
-    Department_name VARCHAR(100) NOT NULL,
-    HOD INT
+-- Create Tables
+CREATE TABLE departments (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    hod_id INTEGER
 );
 
-CREATE TABLE Faculty (
-    FID SERIAL PRIMARY KEY,
-    Faculty_name VARCHAR(100) NOT NULL,
-    DID INT REFERENCES Departments(DID) ON DELETE CASCADE,
-    Designation VARCHAR(50),
-    Password VARCHAR(100) NOT NULL
+CREATE TABLE faculty (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(100) NOT NULL,
+    department_id INTEGER REFERENCES departments(id),
+    role VARCHAR(20) DEFAULT 'faculty',
+    designation VARCHAR(50),
+    expertise TEXT[],
+    preferences TEXT[]
 );
 
 CREATE TABLE Classes (

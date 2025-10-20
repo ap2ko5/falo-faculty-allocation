@@ -14,7 +14,7 @@ import { authService } from '../services/api';
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
   });
   const [error, setError] = useState('');
@@ -46,13 +46,12 @@ export default function Login({ onLogin }) {
           <form onSubmit={handleSubmit}>
             <TextField
               fullWidth
-              label="Email"
-              type="email"
+              label="Username"
               margin="normal"
               required
-              value={formData.email}
+              value={formData.username}
               onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
+                setFormData({ ...formData, username: e.target.value })
               }
             />
             <TextField
