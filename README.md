@@ -1,4 +1,47 @@
-Faculty Allocation System (FALO) – Complete Feature Fix and Data Integration
+# Faculty Allocation System (FALO)
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js (v16 or higher)
+- npm (v7 or higher)
+- Supabase account (for database)
+
+### Installation & Running
+
+**Option 1: Automated Setup (Recommended)**
+```bash
+# Make the start script executable and run it
+chmod +x start.sh
+./start.sh
+```
+
+**Option 2: Manual Setup**
+```bash
+# Install dependencies
+cd backend && npm install && cd ..
+cd frontend && npm install && cd ..
+
+# Configure environment
+# Edit backend/.env with your Supabase credentials (see backend/.env.example)
+
+# Start backend (in one terminal)
+cd backend && npm start
+
+# Start frontend (in another terminal)
+cd frontend && npm run dev
+```
+
+### Access the Application
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:5051
+- Health Check: http://localhost:5051/health
+
+📖 **For detailed setup instructions, see [SETUP_GUIDE.md](SETUP_GUIDE.md)**
+
+---
+
+## Faculty Allocation System (FALO) – Complete Feature Fix and Data Integration
 
 1. **Fix all backend errors and implement missing features:**
    - Ensure all fetches (faculty, courses, classes, allocations, timetable) from the DB return real data, not errors or blanks.

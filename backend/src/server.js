@@ -11,8 +11,10 @@ import { config, initializeDatabase } from './config/database.js';
 
 dotenv.config();
 
-// Initialize database
-initializeDatabase().catch(console.error);
+// Initialize database (don't crash if it fails)
+initializeDatabase().catch(err => {
+  console.error('Database initialization error:', err.message);
+});
 
 const app = express();
 
