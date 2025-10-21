@@ -73,9 +73,7 @@ export default function Allocations({ user }) {
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
     { field: 'facultyName', headerName: 'Faculty', width: 200 },
-    { field: 'courseName', headerName: 'Course', width: 220 },
-    { field: 'className', headerName: 'Class', width: 120 },
-    { field: 'semester', headerName: 'Semester', width: 100 },
+    { field: 'courseDetails', headerName: 'Course - Section - Semester', width: 350 },
     { 
       field: 'status', 
       headerName: 'Status', 
@@ -159,9 +157,19 @@ export default function Allocations({ user }) {
           classes: cl?.length || 0 
         });
         console.log('Classes data:', cl);
-        setFaculties(f || []);
-        setCourses(c || []);
-        setClasses(cl || []);
+        
+        // Sort all arrays alphabetically
+        const sortedFaculties = (f || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        const sortedCourses = (c || []).sort((a, b) => (a.name || a.title || '').localeCompare(b.name || b.title || ''));
+        const sortedClasses = (cl || []).sort((a, b) => {
+          const nameA = a.display_name || a.name || '';
+          const nameB = b.display_name || b.name || '';
+          return nameA.localeCompare(nameB);
+        });
+        
+        setFaculties(sortedFaculties);
+        setCourses(sortedCourses);
+        setClasses(sortedClasses);
       } catch (e) {
         // Not fatal for page render; will show IDs if names unavailable
         console.error('Failed to load reference data', e);
@@ -310,21 +318,23 @@ export default function Allocations({ user }) {
             }
             
             // Build class name
-            let className = klass?.name || '';
+            let className = '';
             if (klass?.section) {
-              className = `${className} ${klass.section}`.trim();
+              className = klass.section;
+            } else if (klass?.name) {
+              className = klass.name;
+            } else {
+              className = `#${a.class_id}`;
             }
-            // Fallback to class_id if nothing else works
-            if (!className) {
-              className = `Class #${a.class_id}`;
-            }
+            
+            // Build course details: "Course Name - Section - Semester X"
+            const courseName = course?.name || course?.title || `Course #${a.course_id}`;
+            const courseDetails = `${courseName} - ${className} - Sem ${a.semester}`;
             
             return {
               id: a.id,
               facultyName: faculty?.name || `Faculty #${a.faculty_id}`,
-              courseName: course?.name || course?.title || `Course #${a.course_id}`,
-              className,
-              semester: a.semester,
+              courseDetails,
               status: a.status || 'active',
               createdAt: a.created_at,
             };
@@ -359,52 +369,60 @@ export default function Allocations({ user }) {
                 Your preference will be submitted for admin approval.
               </Alert>
             )}
-            
-            {/* Quick Reference */}
-            <Alert severity="warning" sx={{ mb: 1 }}>
-              <Typography variant="subtitle2" gutterBottom><strong>Quick Reference - Use these IDs:</strong></Typography>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
-                <strong>Faculty:</strong> 1=Dr. John Smith, 2=Dr. Jane Doe, 3=Prof. Bob Wilson<br />
-                <strong>Courses:</strong> 1=Data Structures, 2=Algorithms, 3=Database Systems, 4=Web Development<br />
-                <strong>Classes:</strong> 1=CSEA, 2=CSEB, 3=MEA, 4=CEA
-              </Typography>
-            </Alert>
 
             {isAdmin && (
-              <TextField
-                fullWidth
-                label="Faculty ID"
-                type="number"
-                value={formData.facultyId}
-                onChange={(e) =>
-                  setFormData({ ...formData, facultyId: e.target.value })
-                }
-                required
-                helperText="Enter the numeric Faculty ID (e.g., 1, 2, 3)"
-              />
+              <FormControl fullWidth required>
+                <InputLabel>Faculty</InputLabel>
+                <Select
+                  value={formData.facultyId}
+                  label="Faculty"
+                  onChange={(e) =>
+                    setFormData({ ...formData, facultyId: e.target.value })
+                  }
+                >
+                  {faculties.map((faculty) => (
+                    <MenuItem key={faculty.id} value={faculty.id}>
+                      {faculty.name} ({faculty.email})
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             )}
-            <TextField
-              fullWidth
-              label="Course ID"
-              type="number"
-              value={formData.courseId}
-              onChange={(e) =>
-                setFormData({ ...formData, courseId: e.target.value })
-              }
-              required
-              helperText="Enter the numeric Course ID (e.g., 1, 2, 3, 4)"
-            />
-            <TextField
-              fullWidth
-              label="Class ID"
-              type="number"
-              value={formData.classId}
-              onChange={(e) =>
-                setFormData({ ...formData, classId: e.target.value })
-              }
-              required
-              helperText="Enter the numeric Class ID (e.g., 1=CSEA, 2=CSEB, 3=MEA, 4=CEA)"
-            />
+            
+            <FormControl fullWidth required>
+              <InputLabel>Course</InputLabel>
+              <Select
+                value={formData.courseId}
+                label="Course"
+                onChange={(e) =>
+                  setFormData({ ...formData, courseId: e.target.value })
+                }
+              >
+                {courses.map((course) => (
+                  <MenuItem key={course.id} value={course.id}>
+                    {course.code} - {course.name || course.title}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
+            <FormControl fullWidth required>
+              <InputLabel>Class Section</InputLabel>
+              <Select
+                value={formData.classId}
+                label="Class Section"
+                onChange={(e) =>
+                  setFormData({ ...formData, classId: e.target.value })
+                }
+              >
+                {classes.map((cls) => (
+                  <MenuItem key={cls.id} value={cls.id}>
+                    Section {cls.section} - Semester {cls.semester}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
             <TextField
               fullWidth
               label="Academic Year"
@@ -415,17 +433,23 @@ export default function Allocations({ user }) {
               }
               required
             />
-            <TextField
-              fullWidth
-              label="Semester"
-              type="number"
-              inputProps={{ min: 1, max: 8 }}
-              value={formData.semester}
-              onChange={(e) =>
-                setFormData({ ...formData, semester: Number(e.target.value) })
-              }
-              required
-            />
+            
+            <FormControl fullWidth required>
+              <InputLabel>Semester</InputLabel>
+              <Select
+                value={formData.semester}
+                label="Semester"
+                onChange={(e) =>
+                  setFormData({ ...formData, semester: Number(e.target.value) })
+                }
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+                  <MenuItem key={sem} value={sem}>
+                    Semester {sem}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 2, gap: 1 }}>

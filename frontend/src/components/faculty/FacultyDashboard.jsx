@@ -220,9 +220,7 @@ const FacultyDashboard = ({ onLogout, user }) => {
                           )}
                         </TableCell>
                         <TableCell>
-                          {allocation.class?.display_name || 
-                           allocation.class?.name || 
-                           `Class #${allocation.class_id}`}
+                          Section {allocation.class?.section || '-'}
                         </TableCell>
                         <TableCell>{allocation.semester}</TableCell>
                         <TableCell>{allocation.academic_year}</TableCell>

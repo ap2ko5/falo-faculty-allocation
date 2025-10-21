@@ -81,6 +81,49 @@ export const allocationService = {
     if (!response.ok) throw new Error('Failed to delete allocation');
     return response.json();
   },
+
+  autoAllocate: async (data) => {
+    const response = await fetch(`${API_URL}/allocations/auto-allocate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to run auto-allocation');
+    return response.json();
+  },
+
+  getWindows: async () => {
+    const response = await fetch(`${API_URL}/allocations/windows`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch allocation windows');
+    return response.json();
+  },
+
+  createWindow: async (windowData) => {
+    const response = await fetch(`${API_URL}/allocations/windows`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(windowData),
+    });
+    if (!response.ok) throw new Error('Failed to create allocation window');
+    return response.json();
+  },
+
+  closeWindow: async (windowId) => {
+    const response = await fetch(`${API_URL}/allocations/windows/${windowId}/close`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to close allocation window');
+    return response.json();
+  },
 };
 
 export const facultyService = {
@@ -189,6 +232,53 @@ export const classService = {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
     if (!response.ok) throw new Error('Failed to fetch classes');
+    return response.json();
+  },
+};
+
+export const timetableService = {
+  getByClass: async (classId) => {
+    const response = await fetch(`${API_URL}/timetable/class/${classId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch class timetable');
+    return response.json();
+  },
+
+  getByFaculty: async (facultyId) => {
+    const response = await fetch(`${API_URL}/timetable/faculty/${facultyId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch faculty timetable');
+    return response.json();
+  },
+
+  getAll: async () => {
+    const response = await fetch(`${API_URL}/timetable`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch all timetables');
+    return response.json();
+  },
+
+  getStats: async () => {
+    const response = await fetch(`${API_URL}/timetable/stats`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch timetable stats');
+    return response.json();
+  },
+
+  generate: async (data) => {
+    const response = await fetch(`${API_URL}/timetable/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) throw new Error('Failed to generate timetables');
     return response.json();
   },
 };

@@ -10,6 +10,11 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 import {
   AutoFixHigh as AutoFixIcon,
@@ -27,12 +32,22 @@ const AdminDashboard = ({ onLogout }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [autoAllocateDialog, setAutoAllocateDialog] = useState(false);
+  const [allocationData, setAllocationData] = useState({
+    academic_year: new Date().getFullYear(),
+    semester: 1
+  });
 
   const handleAutoAllocation = async () => {
     setLoading(true);
     try {
-      await allocationService.autoAllocate();
-      setSnackbar({ open: true, message: 'Auto allocation completed successfully!', severity: 'success' });
+      const result = await allocationService.autoAllocate(allocationData);
+      setAutoAllocateDialog(false);
+      setSnackbar({ 
+        open: true, 
+        message: `Auto allocation completed! Created ${result.allocationsCreated || 0} allocations and ${result.timetableEntriesCreated || 0} timetable entries.`, 
+        severity: 'success' 
+      });
     } catch (error) {
       setSnackbar({ open: true, message: error.message, severity: 'error' });
     } finally {
@@ -145,7 +160,16 @@ const AdminDashboard = ({ onLogout }) => {
               description="Automatically allocate faculty to courses"
               icon={AutoFixIcon}
               color="success"
-              onClick={handleAutoAllocation}
+              onClick={() => setAutoAllocateDialog(true)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} lg={4}>
+            <ActionCard
+              title="View Timetable"
+              description="Check generated class schedules and timings"
+              icon={ScheduleIcon}
+              color="info"
+              onClick={() => navigate('/timetable')}
             />
           </Grid>
           <Grid item xs={12} sm={6} lg={4}>
@@ -202,6 +226,44 @@ const AdminDashboard = ({ onLogout }) => {
             {snackbar.message}
           </Alert>
         </Snackbar>
+
+        <Dialog open={autoAllocateDialog} onClose={() => setAutoAllocateDialog(false)} maxWidth="sm" fullWidth>
+          <DialogTitle>Run Auto Allocation</DialogTitle>
+          <DialogContent>
+            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <TextField
+                label="Academic Year"
+                type="number"
+                fullWidth
+                value={allocationData.academic_year}
+                onChange={(e) => setAllocationData({ ...allocationData, academic_year: parseInt(e.target.value) })}
+                helperText="Enter the academic year (e.g., 2024)"
+              />
+              <TextField
+                label="Semester"
+                type="number"
+                fullWidth
+                value={allocationData.semester}
+                onChange={(e) => setAllocationData({ ...allocationData, semester: parseInt(e.target.value) })}
+                inputProps={{ min: 1, max: 8 }}
+                helperText="Enter semester (1-8)"
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAutoAllocateDialog(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAutoAllocation} 
+              variant="contained" 
+              color="success"
+              disabled={loading}
+            >
+              {loading ? <CircularProgress size={24} /> : 'Run Auto Allocation'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </DashboardLayout>
   );

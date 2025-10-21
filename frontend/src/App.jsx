@@ -17,6 +17,7 @@ import Register from './pages/Register';
 import Allocations from './pages/Allocations';
 import Faculty from './pages/Faculty';
 import Courses from './pages/Courses';
+import Timetable from './pages/Timetable';
 
 const queryClient = new QueryClient();
 
@@ -170,6 +171,16 @@ function App() {
                   element={
                     isLoggedIn ? (
                       <Courses />
+                    ) : (
+                      <Navigate to="/login" replace />
+                    )
+                  }
+                />
+                <Route
+                  path="/timetable"
+                  element={
+                    isLoggedIn ? (
+                      <Timetable user={user} />
                     ) : (
                       <Navigate to="/login" replace />
                     )

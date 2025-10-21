@@ -102,7 +102,9 @@ export default function Courses() {
         departmentService.getAll(),
       ]);
       setCourses(coursesData);
-      setDepartments(deptData);
+      // Sort departments alphabetically
+      const sortedDepts = (deptData || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setDepartments(sortedDepts);
     } catch (err) {
       setError(err.message);
     } finally {

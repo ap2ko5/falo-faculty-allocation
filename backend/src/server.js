@@ -8,6 +8,7 @@ import courseRoutes from './routes/courses.js';
 import reportRoutes from './routes/reports.js';
 import departmentRoutes from './routes/departments.js';
 import classRoutes from './routes/classes.js';
+import timetableRoutes from './routes/timetable.js';
 import { config, initializeDatabase } from './config/database.js';
 
 dotenv.config();
@@ -28,6 +29,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/classes', classRoutes);
+app.use('/api/timetable', timetableRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', message: 'FALO Backend Running' });

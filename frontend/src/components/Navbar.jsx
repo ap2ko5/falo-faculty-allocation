@@ -20,6 +20,7 @@ import PeopleIcon from '@mui/icons-material/People';
 import SchoolIcon from '@mui/icons-material/School';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import WindowIcon from '@mui/icons-material/Window';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
@@ -47,6 +48,9 @@ export default function Navbar({ isLoggedIn, onLogout, user }) {
       <Button color="inherit" onClick={() => navigate('/allocations')}>
         Allocations
       </Button>
+      <Button color="inherit" onClick={() => navigate('/timetable')}>
+        Timetable
+      </Button>
       <Button color="inherit" onClick={() => navigate('/windows')}>
         Windows
       </Button>
@@ -66,6 +70,9 @@ export default function Navbar({ isLoggedIn, onLogout, user }) {
       </Button>
       <Button color="inherit" onClick={() => navigate('/allocations')}>
         My Allocations
+      </Button>
+      <Button color="inherit" onClick={() => navigate('/timetable')}>
+        My Timetable
       </Button>
       <Button color="inherit" onClick={onLogout}>
         Logout
@@ -99,6 +106,7 @@ export default function Navbar({ isLoggedIn, onLogout, user }) {
         { text: 'Faculty', icon: <PeopleIcon />, action: () => navigate('/faculty') },
         { text: 'Courses', icon: <SchoolIcon />, action: () => navigate('/courses') },
         { text: 'Allocations', icon: <AssignmentIcon />, action: () => navigate('/allocations') },
+        { text: 'Timetable', icon: <ScheduleIcon />, action: () => navigate('/timetable') },
         { text: 'Windows', icon: <WindowIcon />, action: () => navigate('/windows') },
         { text: 'Logout', icon: <LogoutIcon />, action: onLogout },
       ];
@@ -109,6 +117,7 @@ export default function Navbar({ isLoggedIn, onLogout, user }) {
       { text: 'Dashboard', icon: <DashboardIcon />, action: () => navigate('/dashboard') },
       { text: 'Courses', icon: <SchoolIcon />, action: () => navigate('/courses') },
       { text: 'My Allocations', icon: <AssignmentIcon />, action: () => navigate('/allocations') },
+      { text: 'My Timetable', icon: <ScheduleIcon />, action: () => navigate('/timetable') },
       { text: 'Logout', icon: <LogoutIcon />, action: onLogout },
     ];
   };

@@ -16,8 +16,7 @@ router.get('/', async (req, res) => {
         *,
         department:department_id (
           id,
-          name,
-          code
+          name
         )
       `)
       .order('semester')
@@ -31,7 +30,7 @@ router.get('/', async (req, res) => {
     const formatted = (data || []).map((cl) => ({
       ...cl,
       departments: cl.department,
-      display_name: `${cl.department?.code || ''}${cl.section || ''}`,
+      display_name: `${cl.section || 'Section'} - Sem ${cl.semester}`,
     }));
 
     res.json(formatted);

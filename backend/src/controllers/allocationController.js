@@ -1,5 +1,76 @@
 import { supabase } from '../config/database.js';
 
+/**
+ * Generate timetable entries for allocations
+ * Distributes classes across Monday-Friday, 8 time slots per day
+ * Avoids conflicts: same faculty/class can't be in multiple places at once
+ */
+async function generateTimetable(allocations, classes) {
+  const timetableEntries = [];
+  
+  // Track occupied slots: key = "faculty_id-day-slot" or "class_id-day-slot"
+  const facultySlots = new Set();
+  const classSlots = new Set();
+  const roomCounter = {}; // Track room assignments per day/slot
+  
+  // Time slots: 1-8 (e.g., 9:00 AM - 4:00 PM with 1-hour slots)
+  const TIME_SLOTS = 8;
+  const DAYS = 5; // Monday to Friday
+  
+  // Helper to find next available slot for a faculty-class pair
+  const findAvailableSlot = (facultyId, classId) => {
+    for (let day = 1; day <= DAYS; day++) {
+      for (let slot = 1; slot <= TIME_SLOTS; slot++) {
+        const facultyKey = `${facultyId}-${day}-${slot}`;
+        const classKey = `${classId}-${day}-${slot}`;
+        
+        // Check if both faculty and class are free at this slot
+        if (!facultySlots.has(facultyKey) && !classSlots.has(classKey)) {
+          return { day, slot };
+        }
+      }
+    }
+    return null; // No slot available (overbooked)
+  };
+  
+  // Helper to generate room number
+  const getRoomNumber = (day, slot, classId) => {
+    const key = `${day}-${slot}`;
+    if (!roomCounter[key]) roomCounter[key] = 0;
+    roomCounter[key]++;
+    
+    // Use class department info if available
+    const cls = classes.find(c => c.id === classId);
+    const prefix = cls?.department_id ? `D${cls.department_id}` : 'R';
+    return `${prefix}${100 + roomCounter[key]}`;
+  };
+  
+  // Process each allocation
+  for (const allocation of allocations) {
+    const slot = findAvailableSlot(allocation.faculty_id, allocation.class_id);
+    
+    if (slot) {
+      const { day, slot: timeSlot } = slot;
+      const roomNumber = getRoomNumber(day, timeSlot, allocation.class_id);
+      
+      timetableEntries.push({
+        allocation_id: allocation.id,
+        day_of_week: day,
+        time_slot: timeSlot,
+        room_number: roomNumber
+      });
+      
+      // Mark slots as occupied
+      facultySlots.add(`${allocation.faculty_id}-${day}-${timeSlot}`);
+      classSlots.add(`${allocation.class_id}-${day}-${timeSlot}`);
+    } else {
+      console.warn(`Warning: Could not find available slot for allocation ${allocation.id}`);
+    }
+  }
+  
+  return timetableEntries;
+}
+
 const allocationController = {
   getAll: async (req, res) => {
     try {
@@ -113,9 +184,175 @@ const allocationController = {
 
   autoAllocate: async (req, res) => {
     try {
-      // TODO: Implement auto-allocation logic
-      res.json({ message: 'Auto-allocation not implemented yet' });
+      const { academic_year, semester } = req.body;
+      
+      if (!academic_year || !semester) {
+        return res.status(400).json({ error: 'Academic year and semester are required' });
+      }
+
+      console.log(`Starting auto-allocation for ${academic_year} Semester ${semester}`);
+
+      // Step 1: Fetch all required data
+      const [facultyResult, coursesResult, classesResult, existingAllocations] = await Promise.all([
+        supabase.from('faculty').select('*').eq('role', 'faculty'),
+        supabase.from('courses').select('*').eq('semester', semester),
+        supabase.from('classes').select('*').eq('semester', semester).eq('academic_year', academic_year),
+        supabase.from('allocations').select('*').eq('academic_year', academic_year).eq('semester', semester)
+      ]);
+
+      if (facultyResult.error) throw facultyResult.error;
+      if (coursesResult.error) throw coursesResult.error;
+      if (classesResult.error) throw classesResult.error;
+
+      const faculty = facultyResult.data || [];
+      const courses = coursesResult.data || [];
+      const classes = classesResult.data || [];
+      const existing = existingAllocations.data || [];
+
+      console.log(`Found: ${faculty.length} faculty, ${courses.length} courses, ${classes.length} classes`);
+      console.log(`Existing allocations: ${existing.length}`);
+
+      // Step 2: Filter out already allocated combinations
+      const allocatedKey = (f, cl, co) => `${f}-${cl}-${co}`;
+      const existingKeys = new Set(existing.map(a => allocatedKey(a.faculty_id, a.class_id, a.course_id)));
+
+      // Step 3: Group courses by department
+      const coursesByDept = {};
+      courses.forEach(course => {
+        if (!coursesByDept[course.department_id]) {
+          coursesByDept[course.department_id] = [];
+        }
+        coursesByDept[course.department_id].push(course);
+      });
+
+      // Step 4: Group classes by department
+      const classesByDept = {};
+      classes.forEach(cls => {
+        if (!classesByDept[cls.department_id]) {
+          classesByDept[cls.department_id] = [];
+        }
+        classesByDept[cls.department_id].push(cls);
+      });
+
+      // Step 5: Group faculty by department
+      const facultyByDept = {};
+      faculty.forEach(f => {
+        if (!facultyByDept[f.department_id]) {
+          facultyByDept[f.department_id] = [];
+        }
+        facultyByDept[f.department_id].push(f);
+      });
+
+      // Step 6: Create allocations
+      const newAllocations = [];
+
+      // For each department
+      Object.keys(coursesByDept).forEach(deptId => {
+        const deptCourses = coursesByDept[deptId];
+        const deptClasses = classesByDept[deptId] || [];
+        const deptFaculty = facultyByDept[deptId] || [];
+
+        if (deptFaculty.length === 0) {
+          console.log(`No faculty available for department ${deptId}`);
+          return;
+        }
+
+        let facultyIndex = 0;
+
+        // For each class in this department
+        deptClasses.forEach(cls => {
+          // For each course in this department
+          deptCourses.forEach(course => {
+            // Round-robin faculty assignment
+            const assignedFaculty = deptFaculty[facultyIndex % deptFaculty.length];
+            facultyIndex++;
+
+            const key = allocatedKey(assignedFaculty.id, cls.id, course.id);
+            
+            // Skip if already allocated
+            if (existingKeys.has(key)) {
+              console.log(`Skipping: Faculty ${assignedFaculty.id} already assigned to Class ${cls.id} Course ${course.id}`);
+              return;
+            }
+
+            // Check expertise match (optional, prioritize but don't require)
+            const hasExpertise = !course.required_expertise || 
+                                course.required_expertise.length === 0 ||
+                                (assignedFaculty.expertise && 
+                                 course.required_expertise.some(req => 
+                                   assignedFaculty.expertise.some(exp => 
+                                     exp.toLowerCase().includes(req.toLowerCase()) ||
+                                     req.toLowerCase().includes(exp.toLowerCase())
+                                   )
+                                 ));
+
+            newAllocations.push({
+              faculty_id: assignedFaculty.id,
+              class_id: cls.id,
+              course_id: course.id,
+              academic_year,
+              semester,
+              status: hasExpertise ? 'approved' : 'pending' // Auto-approve if expertise matches
+            });
+          });
+        });
+      });
+
+      console.log(`Created ${newAllocations.length} new allocations`);
+
+      // Step 7: Insert allocations
+      if (newAllocations.length > 0) {
+        const { data: insertedAllocations, error: insertError } = await supabase
+          .from('allocations')
+          .insert(newAllocations)
+          .select();
+
+        if (insertError) {
+          console.error('Error inserting allocations:', insertError);
+          throw insertError;
+        }
+
+        console.log(`Successfully inserted ${insertedAllocations.length} allocations`);
+
+        // Step 8: Create timetable entries ONLY for faculty allocations (exclude admin)
+        // Filter out allocations where faculty role is 'admin'
+        const facultyAllocations = insertedAllocations.filter(allocation => {
+          const facultyMember = faculty.find(f => f.id === allocation.faculty_id);
+          return facultyMember && facultyMember.role === 'faculty';
+        });
+
+        console.log(`Creating timetables for ${facultyAllocations.length} faculty allocations (excluding admin)`);
+
+        const timetableEntries = await generateTimetable(facultyAllocations, classes);
+        
+        if (timetableEntries.length > 0) {
+          const { data: insertedTimetable, error: timetableError } = await supabase
+            .from('timetable')
+            .insert(timetableEntries)
+            .select();
+
+          if (timetableError) {
+            console.error('Error inserting timetable:', timetableError);
+            // Don't throw - allocations are more important than timetable
+          } else {
+            console.log(`Successfully created ${insertedTimetable.length} timetable entries for faculty only`);
+          }
+        }
+
+        res.json({
+          message: 'Auto-allocation completed successfully',
+          allocations_created: insertedAllocations.length,
+          timetable_entries_created: timetableEntries.length,
+          allocations: insertedAllocations
+        });
+      } else {
+        res.json({
+          message: 'No new allocations needed - all courses already allocated',
+          allocations_created: 0
+        });
+      }
     } catch (err) {
+      console.error('Auto-allocation error:', err);
       res.status(500).json({ error: err.message });
     }
   },
