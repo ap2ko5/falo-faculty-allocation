@@ -75,12 +75,83 @@ const allocationController = {
   getAll: async (req, res) => {
     try {
       // Fetch all data in parallel
+      const fetchClasses = async () => {
+        const result = { data: null, error: null, warnings: [] };
+        const options = {
+          includeName: true,
+          includeAcademicYear: true,
+          includeDeptCode: true,
+        };
+
+        const buildSelect = () => {
+          const fields = [
+            'id',
+            options.includeName ? 'name' : null,
+            'section',
+            'semester',
+            options.includeAcademicYear ? 'academic_year' : null,
+            'department_id',
+            `department:department_id (
+              id,
+              name${options.includeDeptCode ? ',\n              code' : ''}
+            )`,
+          ].filter(Boolean);
+
+          return `
+            ${fields.join(',\n            ')}
+          `;
+        };
+
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          const { data, error } = await supabase
+            .from('classes')
+            .select(buildSelect())
+            .order('semester')
+            .order('section');
+
+          if (!error) {
+            result.data = data;
+            return result;
+          }
+
+          const message = (error.message || '').toLowerCase();
+
+          if (options.includeDeptCode && message.includes('code') && message.includes('does not exist')) {
+            options.includeDeptCode = false;
+            result.warnings.push('classes.department.code missing; retrying without code');
+            continue;
+          }
+
+          if (options.includeName && message.includes('name') && message.includes('does not exist')) {
+            options.includeName = false;
+            result.warnings.push('classes.name missing; retrying without name');
+            continue;
+          }
+
+          if (options.includeAcademicYear && message.includes('academic_year') && message.includes('does not exist')) {
+            options.includeAcademicYear = false;
+            result.warnings.push('classes.academic_year missing; retrying without academic_year');
+            continue;
+          }
+
+          result.error = error;
+          return result;
+        }
+
+        result.error = new Error('Unable to fetch classes after multiple attempts');
+        return result;
+      };
+
       const [allocationsResult, facultyResult, coursesResult, classesResult] = await Promise.all([
         supabase.from('allocations').select('*').order('created_at', { ascending: false }),
         supabase.from('faculty').select('id, name, email, department_id'),
         supabase.from('courses').select('id, name, code, credits, semester'),
-        supabase.from('classes').select('id, name, section, semester, department_id')
+        fetchClasses()
       ]);
+
+      if (classesResult.warnings?.length) {
+        classesResult.warnings.forEach((warning) => console.warn(warning));
+      }
 
       // Check for errors
       if (allocationsResult.error) {
@@ -94,7 +165,22 @@ const allocationController = {
       // Create lookup maps for efficient joining
       const facultyMap = new Map((facultyResult.data || []).map(f => [f.id, f]));
       const courseMap = new Map((coursesResult.data || []).map(c => [c.id, c]));
-      const classMap = new Map((classesResult.data || []).map(cl => [cl.id, cl]));
+      const normalizeClass = (cl) => {
+        const department = cl?.department || null;
+        const sectionLabel = cl?.section ? cl.section.toString().trim() : '';
+        const deptLabel = department?.code || department?.name || '';
+        const semesterLabel = cl?.semester ? `Semester ${cl.semester}` : '';
+        const compositeLabel = [deptLabel, sectionLabel, semesterLabel].filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+
+        return {
+          ...cl,
+          department,
+          name: cl?.name || compositeLabel || `Class ${cl?.id || ''}`.trim(),
+          display_name: compositeLabel || cl?.name || `Class ${cl?.id || ''}`.trim(),
+        };
+      };
+
+      const classMap = new Map((classesResult.data || []).map(cl => [cl.id, normalizeClass(cl)]));
 
       // Join data manually
       const enrichedAllocations = (allocationsResult.data || []).map(allocation => ({

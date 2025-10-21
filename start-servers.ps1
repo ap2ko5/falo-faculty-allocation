@@ -1,179 +1,85 @@
-# FALO Faculty Allocation - Server Startup Script# FALO Faculty Allocation - Server Startup Script
+param()
 
-# This script starts both backend and frontend servers# This script starts both backend and frontend servers
-
-
-
-Write-Host "`n=====================================" -ForegroundColor CyanWrite-Host "`n=====================================" -ForegroundColor Cyan
-
-Write-Host "FALO Server Startup Script" -ForegroundColor CyanWrite-Host "FALO Server Startup Script" -ForegroundColor Cyan
-
-Write-Host "=====================================" -ForegroundColor CyanWrite-Host "=====================================" -ForegroundColor Cyan
-
-Write-Host ""Write-Host ""
-
-
-
-# Kill any existing node processes# Kill any existing node processes
-
-Write-Host "Cleaning up existing processes..." -ForegroundColor YellowWrite-Host "Cleaning up existing processes..." -ForegroundColor Yellow
-
-Get-Process -Name "node" -ErrorAction SilentlyContinue | Stop-Process -ForceGet-Process -Name "node" -ErrorAction SilentlyContinue | Stop-Process -Force
-
-Start-Sleep -Seconds 2Start-Sleep -Seconds 2
-
-Write-Host "✓ Cleanup complete" -ForegroundColor GreenWrite-Host "✓ Cleanup complete" -ForegroundColor Green
-
+# FALO Faculty Allocation - PowerShell startup helper
+Write-Host "`n=====================================" -ForegroundColor Cyan
+Write-Host "FALO Server Startup Script" -ForegroundColor Cyan
+Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Get the script directoryWrite-Host ""
+Write-Host "[1/5] Stopping existing Node.js processes..." -ForegroundColor Yellow
+Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force
+Start-Sleep -Seconds 2
+Write-Host "    Done" -ForegroundColor Green
+Write-Host ""
 
-# Get the script directory
-
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-
-
-
-# Check for Node.js and npm# Get the script directory
-
-Write-Host "Checking Node.js and npm..." -ForegroundColor Yellow
-
-try {# Start Backend$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-
+Write-Host "[2/5] Checking Node.js and npm..." -ForegroundColor Yellow
+try {
     $nodeVersion = node --version
-
-    $npmVersion = npm --versionWrite-Host "`n[2/3] Starting Backend Server..." -ForegroundColor Yellow
-
-    Write-Host "✓ Node.js $nodeVersion detected" -ForegroundColor Green
-
-    Write-Host "✓ npm $npmVersion detected" -ForegroundColor Green$backendPath = Join-Path $scriptDir "backend"# Start Backend
-
+    $npmVersion  = npm --version
+    Write-Host "    Node.js $nodeVersion" -ForegroundColor Green
+    Write-Host "    npm     $npmVersion" -ForegroundColor Green
 } catch {
+    Write-Host "Node.js or npm not found. Install from https://nodejs.org/ and re-run this script." -ForegroundColor Red
+    Read-Host "Press Enter to close"
+    exit 1
+}
+Write-Host ""
 
-    Write-Host "✗ Node.js or npm not found. Please install Node.js from https://nodejs.org/" -ForegroundColor RedStart-Process -FilePath powershell -ArgumentList "-NoExit","-Command","Set-Location '$backendPath'; Write-Host 'BACKEND SERVER' -ForegroundColor Cyan; npm start"Write-Host "Starting Backend Server..." -ForegroundColor Yellow
+$root        = Split-Path -Parent $MyInvocation.MyCommand.Path
+$backendDir  = Join-Path $root 'backend'
+$frontendDir = Join-Path $root 'frontend'
 
-    Read-Host "Press Enter to exit"
+function Install-IfMissing {
+    param(
+        [string]$Path,
+        [string]$Label
+    )
 
-    exit 1Start-Sleep -Seconds 6$backendPath = Join-Path $scriptDir "backend"
-
+    $nodeModules = Join-Path $Path 'node_modules'
+    if (-not (Test-Path $nodeModules)) {
+        Write-Host "Installing $Label dependencies..." -ForegroundColor Yellow
+        Push-Location $Path
+        npm install
+        $exit = $LASTEXITCODE
+        Pop-Location
+        if ($exit -ne 0) {
+            Write-Host "$Label npm install failed. Check the output above." -ForegroundColor Red
+            Read-Host "Press Enter to close"
+            exit 1
+        }
+        Write-Host "    Installed" -ForegroundColor Green
+    } else {
+        Write-Host "$Label dependencies already present." -ForegroundColor Green
+    }
 }
 
-Write-Host ""Write-Host "      Backend running on port 5051" -ForegroundColor GreenStart-Process -FilePath powershell -ArgumentList @('-NoExit','-Command',"Set-Location -Path '$backendPath'; Write-Host 'BACKEND SERVER' -ForegroundColor Cyan; npm start")
-
-
-
-# Install dependencies if neededWrite-Host "✓ Backend starting on http://localhost:5051" -ForegroundColor Green
-
-$backendPath = Join-Path $scriptDir "backend"
-
-$frontendPath = Join-Path $scriptDir "frontend"# Start FrontendWrite-Host ""
-
-
-
-if (-Not (Test-Path (Join-Path $backendPath "node_modules"))) {Write-Host "`n[3/3] Starting Frontend Server..." -ForegroundColor Yellow
-
-    Write-Host "Installing backend dependencies..." -ForegroundColor Yellow
-
-    Push-Location $backendPath$frontendPath = Join-Path $scriptDir "frontend"# Wait a bit for backend to initialize
-
-    npm install
-
-    if ($LASTEXITCODE -ne 0) {Start-Process -FilePath powershell -ArgumentList "-NoExit","-Command","Set-Location '$frontendPath'; Write-Host 'FRONTEND SERVER' -ForegroundColor Cyan; npm run dev"Start-Sleep -Seconds 3
-
-        Write-Host "✗ Backend npm install failed" -ForegroundColor Red
-
-        Pop-LocationStart-Sleep -Seconds 3
-
-        Read-Host "Press Enter to exit"
-
-        exit 1Write-Host "      Frontend running on port 3000" -ForegroundColor Green# Start Frontend
-
-    }
-
-    Pop-LocationWrite-Host "Starting Frontend Server..." -ForegroundColor Yellow
-
-    Write-Host "✓ Backend dependencies installed" -ForegroundColor Green
-
-} else {Write-Host "`n=====================================" -ForegroundColor Cyan$frontendPath = Join-Path $scriptDir "frontend"
-
-    Write-Host "✓ Backend dependencies already installed" -ForegroundColor Green
-
-}Write-Host "SERVERS STARTED SUCCESSFULLY!" -ForegroundColor GreenStart-Process -FilePath powershell -ArgumentList @('-NoExit','-Command',"Set-Location -Path '$frontendPath'; Write-Host 'FRONTEND SERVER' -ForegroundColor Cyan; npm run dev")
-
-
-
-if (-Not (Test-Path (Join-Path $frontendPath "node_modules"))) {Write-Host "=====================================" -ForegroundColor CyanWrite-Host "✓ Frontend starting on http://localhost:3000" -ForegroundColor Green
-
-    Write-Host "Installing frontend dependencies..." -ForegroundColor Yellow
-
-    Push-Location $frontendPathWrite-Host "`nBackend:  http://localhost:5051/api" -ForegroundColor WhiteWrite-Host ""
-
-    npm install
-
-    if ($LASTEXITCODE -ne 0) {Write-Host "Frontend: http://localhost:3000`n" -ForegroundColor White
-
-        Write-Host "✗ Frontend npm install failed" -ForegroundColor Red
-
-        Pop-LocationWrite-Host "=====================================" -ForegroundColor CyanWrite-Host "=====================================" -ForegroundColor Cyan
-
-        Read-Host "Press Enter to exit"
-
-        exit 1Write-Host "Servers are starting!" -ForegroundColor Green
-
-    }
-
-    Pop-LocationWrite-Host "`nTwo PowerShell windows are now open." -ForegroundColor GrayWrite-Host "Backend:  http://localhost:5051" -ForegroundColor White
-
-    Write-Host "✓ Frontend dependencies installed" -ForegroundColor Green
-
-} else {Write-Host "Keep them running while using the app." -ForegroundColor GrayWrite-Host "Frontend: http://localhost:3000" -ForegroundColor White
-
-    Write-Host "✓ Frontend dependencies already installed" -ForegroundColor Green
-
-}Write-Host "Press Ctrl+C in each window to stop.`n" -ForegroundColor GrayWrite-Host "=====================================" -ForegroundColor Cyan
-
+Write-Host "[3/5] Ensuring dependencies..." -ForegroundColor Yellow
+Install-IfMissing -Path $backendDir  -Label 'Backend'
+Install-IfMissing -Path $frontendDir -Label 'Frontend'
 Write-Host ""
 
-Write-Host ""
+Write-Host "[4/5] Starting backend (port 5051)..." -ForegroundColor Yellow
+$backend = Start-Process -FilePath powershell -ArgumentList @('-NoExit','-Command',"Set-Location '$backendDir'; Write-Host '=== BACKEND SERVER ===' -ForegroundColor Cyan; npm start") -PassThru
+Start-Sleep -Seconds 6
+Write-Host "    Backend window launched" -ForegroundColor Green
 
-# Start Backend
-
-Write-Host "Starting Backend Server..." -ForegroundColor Yellow# Ask to open browserWrite-Host "Press any key to exit this script (servers will keep running)..." -ForegroundColor Yellow
-
-Start-Process -FilePath powershell -ArgumentList @('-NoExit','-Command',"Set-Location -Path '$backendPath'; Write-Host 'BACKEND SERVER' -ForegroundColor Cyan; npm start")
-
-Write-Host "✓ Backend starting on http://localhost:5051" -ForegroundColor Green$response = Read-Host "Open browser now? (Y/N)"$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-
-Write-Host ""
-
-if ($response -eq "Y" -or $response -eq "y") {
-
-# Wait a bit for backend to initialize    Start-Sleep -Seconds 2
-
-Start-Sleep -Seconds 3    Start-Process "http://localhost:3000"
-
-    Write-Host "`nBrowser opened!" -ForegroundColor Green
-
-# Start Frontend}
-
-Write-Host "Starting Frontend Server..." -ForegroundColor Yellow
-
-Start-Process -FilePath powershell -ArgumentList @('-NoExit','-Command',"Set-Location -Path '$frontendPath'; Write-Host 'FRONTEND SERVER' -ForegroundColor Cyan; npm run dev")Write-Host "`nPress Enter to close this window..." -ForegroundColor Yellow
-
-Write-Host "✓ Frontend starting on http://localhost:3000" -ForegroundColor GreenRead-Host
+Write-Host "[5/5] Starting frontend (port 3000)..." -ForegroundColor Yellow
+$frontend = Start-Process -FilePath powershell -ArgumentList @('-NoExit','-Command',"Set-Location '$frontendDir'; Write-Host '=== FRONTEND SERVER ===' -ForegroundColor Cyan; npm run dev") -PassThru
+Start-Sleep -Seconds 3
+Write-Host "    Frontend window launched" -ForegroundColor Green
 
 Write-Host ""
-
 Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host "Servers are starting!" -ForegroundColor Green
-Write-Host "=====================================" -ForegroundColor Cyan
-Write-Host "Backend:  http://localhost:5051" -ForegroundColor White
+Write-Host "Backend:  http://localhost:5051/api" -ForegroundColor White
 Write-Host "Frontend: http://localhost:3000" -ForegroundColor White
 Write-Host "=====================================" -ForegroundColor Cyan
+Write-Host "Two PowerShell windows are now running. Keep them open while using the app." -ForegroundColor Gray
+Write-Host "Press Ctrl+C in each server window to stop them." -ForegroundColor Gray
 Write-Host ""
-Write-Host "Two PowerShell windows are now open." -ForegroundColor Gray
-Write-Host "Keep them running while using the app." -ForegroundColor Gray
-Write-Host "Press Ctrl+C in each window to stop." -ForegroundColor Gray
-Write-Host ""
-Write-Host "Press any key to exit this script (servers will keep running)..." -ForegroundColor Yellow
-$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
+$choice = Read-Host "Open the frontend in your browser now? (Y/N)"
+if ($choice -match '^[Yy]$') {
+    Start-Process 'http://localhost:3000'
+}
+Write-Host "Press Enter to close this helper window (servers stay running)..." -ForegroundColor Yellow
+Read-Host > $null

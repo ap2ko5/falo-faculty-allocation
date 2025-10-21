@@ -65,6 +65,15 @@ export default function Timetable({ user }) {
 
   const isAdmin = user?.role === 'admin';
 
+  const formatClassDisplay = (cls) => {
+    if (!cls) return '';
+    const deptSource = cls.departments || cls.department;
+    const deptLabel = deptSource?.code || deptSource?.name || cls.name || 'Class';
+    const sectionLabel = cls.section ? cls.section.toString().trim() : '';
+    const classLabel = [deptLabel, sectionLabel].filter(Boolean).join(' ');
+    return `${classLabel} - Semester ${cls.semester}`;
+  };
+
   useEffect(() => {
     fetchReferenceData();
   }, []);
@@ -334,7 +343,7 @@ export default function Timetable({ user }) {
                   }
                   if (viewType === 'class') {
                     const cls = classes.find(c => c.id === value);
-                    return cls ? (cls.display_name || `Class ${cls.id} - Semester ${cls.semester}`) : value;
+                    return cls ? (cls.display_name || formatClassDisplay(cls)) : value;
                   } else {
                     const faculty = faculties.find(f => f.id === value);
                     return faculty ? `${faculty.name} (${faculty.email})` : value;
@@ -344,7 +353,7 @@ export default function Timetable({ user }) {
                 {viewType === 'class' ? (
                   classes.map((cls) => (
                     <MenuItem key={cls.id} value={cls.id}>
-                      {cls.display_name || `Class ${cls.id} - Semester ${cls.semester}`}
+                      {cls.display_name || formatClassDisplay(cls)}
                     </MenuItem>
                   ))
                 ) : (
