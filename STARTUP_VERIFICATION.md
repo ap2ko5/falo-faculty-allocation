@@ -6,11 +6,11 @@
 **Problem:** Steps were numbered inconsistently (1/3, then 2/6, 3/6, etc.)
 **Fix:** Corrected to sequential numbering 1/7 through 7/7
 
-### 2. Environment File Validation
-**Problem:** START.bat didn't check if .env files exist before starting servers
-**Fix:** Added step [3/7] to verify both backend/.env and frontend/.env exist
-- If missing, displays clear error message with instructions
-- Script exits gracefully instead of failing during server startup
+### 2. Environment File Preparation
+**Problem:** Startup scripts previously failed later when `.env` files were missing.
+**Fix:** `START.bat`, `start-servers.ps1`, and `start.js` now create missing `.env` files from their `.env.example` templates before launching servers.
+- Scripts remind you to update `backend/.env` with real Supabase credentials.
+- Execution stops cleanly if the example files are missing or copies fail.
 
 ### 3. Missing Verification Tool
 **Problem:** No easy way to check if project is ready to run without starting servers
@@ -31,6 +31,7 @@ All three startup methods are working correctly:
 npm start
 ```
 - Uses `start.js` - works on Windows, macOS, Linux
+- Creates missing `.env` files from `.env.example` before launching servers
 - Automatically installs dependencies if missing
 - Starts both servers in single terminal session
 - Handles Ctrl+C gracefully
@@ -42,7 +43,7 @@ START.bat
 - Native Windows experience
 - Opens two separate command windows
 - Step-by-step progress (1/7 through 7/7)
-- Checks for Node.js, npm, and .env files
+- Checks Node.js/npm and creates missing `.env` files from templates (with reminders)
 - Auto-installs dependencies if needed
 - Clear error messages with pauses
 
@@ -52,6 +53,7 @@ START.bat
 ```
 - Windows PowerShell-specific
 - Colorful, user-friendly output
+- Creates missing `.env` files from templates before launching servers
 - Opens two PowerShell windows
 - Dependency validation and auto-install
 - Clean error handling
@@ -85,11 +87,12 @@ Running `node verify-startup.js` confirms:
 
 ## ✅ Updated Files
 
-1. **START.bat** - Fixed numbering, added .env validation
-2. **package.json** - Added `verify` script
-3. **verify-startup.js** - New verification tool
-4. **backend/.env** - Created from .env.example
-5. **frontend/.env** - Created from .env.example
+1. **START.bat** - Rebuilt with 7-step flow, automatic `.env` creation, stronger error handling
+2. **start-servers.ps1** - Mirrors batch improvements with environment prep and updated messaging
+3. **start.js** - Ensures `.env` files exist before launching servers
+4. **package.json** - Hosts `verify` script and updated setup messaging
+5. **.gitignore** - Now ignores local `.env` files while keeping templates tracked
+6. **verify-startup.js** - Verification helper covering structure, dependencies, and env files
 
 ## Available Commands
 
@@ -148,15 +151,17 @@ Windows PowerShell with colorful output and separate windows.
 
 ## Environment Configuration
 
-The .env files are now created but need to be configured with your Supabase credentials:
+The startup scripts will create `.env` files from the example templates if they are missing. Update them with your Supabase credentials before relying on the app:
 
 **backend/.env:**
 ```env
 SUPABASE_URL=your_actual_supabase_url
 SUPABASE_SERVICE_ROLE_KEY=your_actual_service_role_key
+SUPABASE_ANON_KEY=your_actual_anon_key
 JWT_SECRET=your_actual_secret_key
 PORT=5051
 NODE_ENV=development
+# Leave SKIP_DB_CHECK unset (or false) so startup verifies connectivity.
 ```
 
 **frontend/.env:**
@@ -169,7 +174,7 @@ VITE_API_URL=http://localhost:5051/api
 
 ✅ **All startup methods tested and working**
 ✅ **Step numbering corrected in START.bat**
-✅ **Environment file validation added**
+✅ **Environment file preparation added**
 ✅ **Verification script created and tested**
 ✅ **Dependencies confirmed installed**
 ✅ **Configuration files present**

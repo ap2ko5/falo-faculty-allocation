@@ -11,7 +11,7 @@ import { spawn } from 'child_process';
 import { platform } from 'os';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync, copyFileSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -34,6 +34,52 @@ function log(message, color = colors.reset) {
 
 function checkNodeModules(dir) {
   return existsSync(join(__dirname, dir, 'node_modules'));
+}
+
+function ensureEnvFiles() {
+  const envConfigs = [
+    {
+      label: 'Backend',
+      dir: 'backend',
+      file: '.env',
+      example: '.env.example',
+      reminder: 'Update backend/.env with your Supabase URL, keys, and JWT secret.',
+    },
+    {
+      label: 'Frontend',
+      dir: 'frontend',
+      file: '.env',
+      example: '.env.example',
+    },
+  ];
+
+  const reminders = [];
+
+  envConfigs.forEach(({ label, dir, file, example, reminder }) => {
+    const envPath = join(__dirname, dir, file);
+    const examplePath = join(__dirname, dir, example);
+
+    if (existsSync(envPath)) {
+      log(`✅ ${label} ${file} ready`, colors.green);
+      return;
+    }
+
+    if (!existsSync(examplePath)) {
+      throw new Error(`Missing ${dir}/${file} and ${example} template not found.`);
+    }
+
+    try {
+      copyFileSync(examplePath, envPath);
+      log(`⚠️  ${label} ${file} missing. Created from ${example}.`, colors.yellow);
+      if (reminder) {
+        reminders.push(reminder);
+      }
+    } catch (error) {
+      throw new Error(`Failed to create ${dir}/${file}: ${error.message}`);
+    }
+  });
+
+  return reminders;
 }
 
 function runCommand(command, args, options) {
@@ -103,6 +149,10 @@ async function main() {
     await runCommand(npmCmd, ['--version']);
     log('✅ Node.js and npm detected\n', colors.green);
 
+  log('🧪 Preparing environment files...', colors.yellow);
+  const envReminders = ensureEnvFiles();
+  log('✅ Environment files ready\n', colors.green);
+
     // Install dependencies if needed
     await installDependencies('backend', 'Backend');
     await installDependencies('frontend', 'Frontend');
@@ -126,6 +176,10 @@ async function main() {
     log('Backend:  http://localhost:5051/api', colors.cyan);
     log('Frontend: http://localhost:3000\n', colors.cyan);
     log('========================================\n', colors.cyan);
+    if (envReminders.length) {
+      envReminders.forEach(message => log(`⚠️  ${message}`, colors.yellow));
+      console.log('');
+    }
     log('Press Ctrl+C to stop both servers\n', colors.yellow);
 
     // Handle Ctrl+C to kill both processes

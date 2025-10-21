@@ -27,6 +27,12 @@ Choose one method:
 npm run setup
 ```
 
+**Optional (recommended):** run the pre-flight check to confirm your environment is ready:
+```bash
+npm run verify
+```
+This command checks Node.js versions, required directories, dependencies, and the presence of `.env` files. If `.env` files are missing, copy the `.env.example` templates or run `npm start` once to generate them before updating the values.
+
 **Option B: Manual installation**
 ```bash
 # Install backend dependencies
@@ -42,29 +48,25 @@ cd ..
 
 ### 3. Configure Environment Variables
 
-**Backend Configuration:**
+`npm start`, `START.bat`, and `start-servers.ps1` will create `.env` files from the included `.env.example` templates if they are missing. Edit the generated files with your own credentials before using the app. You can also copy them manually:
+
 ```bash
-# Copy example file
 cp backend/.env.example backend/.env
-
-# Edit backend/.env with your values
-```
-
-Required backend environment variables:
-```env
-SUPABASE_URL=your_supabase_project_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-JWT_SECRET=your_random_secret_key
-PORT=5051
-```
-
-**Frontend Configuration:**
-```bash
-# Copy example file
 cp frontend/.env.example frontend/.env
 ```
 
-Frontend environment variables (usually no changes needed):
+Required backend environment variables (`backend/.env`):
+```env
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SUPABASE_ANON_KEY=your_anon_key
+JWT_SECRET=your_random_secret_key
+PORT=5051
+NODE_ENV=development
+# Leave SKIP_DB_CHECK unset (or false) so startup verifies your database connection.
+```
+
+Frontend environment variables (`frontend/.env`) — usually no changes needed:
 ```env
 VITE_API_URL=http://localhost:5051/api
 ```
@@ -93,6 +95,7 @@ node start.js
 
 This will:
 - Check for Node.js and npm
+- Ensure `.env` files exist (created from `.env.example` when missing)
 - Install dependencies if missing
 - Start both backend and frontend servers
 - Show you the URLs to access
@@ -103,12 +106,16 @@ This will:
 ```cmd
 START.bat
 ```
+- Ensures `.env` files exist (created from `.env.example` when missing).
+- Installs dependencies automatically if `node_modules` folders are missing.
 Double-click `START.bat` in File Explorer, or run from Command Prompt.
 
 **Option 2: PowerShell script**
 ```powershell
 .\start-servers.ps1
 ```
+- Ensures `.env` files exist (created from `.env.example` when missing).
+- Installs dependencies automatically if `node_modules` folders are missing.
 
 #### macOS/Linux Method
 
@@ -151,6 +158,7 @@ Once both servers are running:
 ```bash
 npm start              # Start both servers (cross-platform)
 npm run setup          # Install all dependencies
+npm run verify         # Run pre-flight checks for env files and dependencies
 npm run install:all    # Install backend and frontend dependencies
 npm run install:backend   # Install only backend dependencies
 npm run install:frontend  # Install only frontend dependencies

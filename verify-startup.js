@@ -110,7 +110,7 @@ if (allChecks) {
   log('❌ SOME CHECKS FAILED', colors.red);
   log('\nPlease fix the issues above before running the application.', colors.yellow);
   log('\nQuick fixes:', colors.cyan);
-  log('  - Missing .env files? Run: npm run setup', colors.reset);
+  log('  - Missing .env files? Copy the .env.example files or run npm start once to generate them', colors.reset);
   log('  - Missing dependencies? Run: npm run install:all', colors.reset);
   console.log('\n' + '='.repeat(50) + '\n');
   process.exit(1);

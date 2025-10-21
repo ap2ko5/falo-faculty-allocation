@@ -15,7 +15,7 @@
     "start:frontend": "npm run dev --prefix frontend",
     "build:frontend": "npm run build --prefix frontend",
     "clean": "node -e \"const fs=require('fs');const path=require('path');['backend','frontend'].forEach(d=>{const nm=path.join(d,'node_modules');if(fs.existsSync(nm))fs.rmSync(nm,{recursive:true,force:true})})\"",
-    "setup": "npm run install:all && echo Setup complete! Create .env files in backend/ and frontend/ before running."
+  "setup": "npm run install:all && echo Dependencies installed. Run npm start (or START.bat on Windows) to prepare env files and launch servers."
   },
   "keywords": [
     "faculty",

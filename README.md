@@ -31,15 +31,27 @@ Note: On first load, the app shows only the Login page until you authenticate. A
 npm run setup
 ```
 
-2) Backend environment variables — create `backend/.env`:
+2) **Optional:** Confirm the workspace is ready before launching servers:
+```bash
+npm run verify
+```
+This checks Node.js versions, required folders, dependencies, and `.env` files.
+If `.env` files are reported missing, copy the `.env.example` versions or run `npm start` once to generate them before filling in your credentials.
+
+3) **Configure environment variables.** Startup scripts create `backend/.env` and `frontend/.env` from their `.env.example` templates when missing, but you must edit them with your own values before using the app.
+
+Backend configuration (`backend/.env`):
 ```env
 SUPABASE_URL=YOUR_SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+SUPABASE_ANON_KEY=YOUR_ANON_KEY
 JWT_SECRET=change_me
 PORT=5051
+NODE_ENV=development
+# Leave SKIP_DB_CHECK unset (or false) so startup verifies your database connection.
 ```
 
-3) Frontend environment variables — create `frontend/.env`:
+Frontend configuration (`frontend/.env`):
 ```env
 VITE_API_URL=http://localhost:5051/api
 ```
@@ -62,6 +74,9 @@ node verify-schema.js
 ```bash
 npm start
 ```
+- Ensures `.env` files exist (created from `.env.example` when missing).
+- Launches backend on `http://localhost:5051` and frontend on `http://localhost:3000`.
+- Installs dependencies automatically if `node_modules` folders are missing.
 
 **Option 2: Separate terminals**
 ```bash
@@ -78,11 +93,15 @@ npm run start:frontend
 ```cmd
 START.bat
 ```
+- Ensures `.env` files exist (created from `.env.example` when missing).
+- Installs dependencies automatically if `node_modules` folders are missing.
 
 **Option 2: PowerShell script**
 ```powershell
 .\start-servers.ps1
 ```
+- Ensures `.env` files exist (created from `.env.example` when missing).
+- Installs dependencies automatically if `node_modules` folders are missing.
 
 ### Manual Start (All Platforms)
 
