@@ -13,31 +13,35 @@ Note: On first load, the app shows only the Login page until you authenticate. A
 - Clean, responsive UI using Material-UI
 
 ## Requirements
-- Windows 10/11 (PowerShell)
-- Node.js (LTS 18+ recommended, 20+ fine; repo previously run on Node 25)
-- Supabase project (PostgreSQL)
+- **Any Operating System**: Windows, macOS, or Linux
+- **Node.js** 18+ (LTS recommended)
+- **npm** 9+ (comes with Node.js)
+- **Supabase project** (PostgreSQL database)
+
+> **Cross-Platform Support**: This project now works on all major operating systems. See [SETUP.md](./SETUP.md) for platform-specific instructions.
 
 ## Setup (one-time)
-1) Backend environment variables — create `backend/.env`:
+
+**For detailed cross-platform setup instructions, see [SETUP.md](./SETUP.md)**
+
+### Quick Setup
+
+1) **Install dependencies** (all platforms):
+```bash
+npm run setup
 ```
+
+2) Backend environment variables — create `backend/.env`:
+```env
 SUPABASE_URL=YOUR_SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
 JWT_SECRET=change_me
 PORT=5051
 ```
 
-2) Frontend environment variables — create `frontend/.env`:
-```
+3) Frontend environment variables — create `frontend/.env`:
+```env
 VITE_API_URL=http://localhost:5051/api
-```
-
-3) Install dependencies:
-```powershell
-cd "C:\Users\HP\Desktop\dbms project\falo-faculty-allocation\backend"
-npm install
-
-cd "..\frontend"
-npm install
 ```
 
 4) Initialize database (Supabase)
@@ -45,27 +49,56 @@ npm install
 - Optionally run `database_reset.sql` to reset.
 
 5) Verify backend connectivity (optional):
-```powershell
-cd "..\backend"
+```bash
+cd backend
 node verify-schema.js
 ```
 
 ## Run (development)
-Open two PowerShell terminals.
 
-- Terminal 1 — Backend
-```powershell
-cd "C:\Users\HP\Desktop\dbms project\falo-faculty-allocation\backend"
+### Cross-Platform (Recommended)
+
+**Option 1: Single command** (starts both servers)
+```bash
 npm start
 ```
 
-- Terminal 2 — Frontend
+**Option 2: Separate terminals**
+```bash
+# Terminal 1 - Backend
+npm run start:backend
+
+# Terminal 2 - Frontend
+npm run start:frontend
+```
+
+### Windows-Specific
+
+**Option 1: Batch file**
+```cmd
+START.bat
+```
+
+**Option 2: PowerShell script**
 ```powershell
-cd "C:\Users\HP\Desktop\dbms project\falo-faculty-allocation\frontend"
+.\start-servers.ps1
+```
+
+### Manual Start (All Platforms)
+
+Terminal 1 — Backend
+```bash
+cd backend
+npm start
+```
+
+Terminal 2 — Frontend
+```bash
+cd frontend
 npm run dev
 ```
 
-Visit: http://localhost:3000
+**Visit:** http://localhost:3000
 
 ## Default accounts
 | Username | Password | Role |
@@ -108,22 +141,31 @@ falo-faculty-allocation/
 ```
 
 ## Troubleshooting
-Backend doesn’t start
+
+**Port already in use**
+
+Windows (PowerShell):
 ```powershell
+# Find process on port 5051
 netstat -ano | findstr :5051
-# taskkill /PID <PID> /F
+# Kill process (replace <PID> with actual ID)
+taskkill /PID <PID> /F
 ```
 
-Frontend doesn’t start
-```powershell
-netstat -ano | findstr :3000
-# Start in fresh terminal if needed
+macOS/Linux:
+```bash
+# Find and kill process on port 5051
+lsof -ti:5051 | xargs kill -9
+# For port 3000
+lsof -ti:3000 | xargs kill -9
 ```
 
-Login issues
-- Ensure backend is running and env vars are set.
-- Check browser devtools console for errors.
-- Verify DB seeded with provided SQL.
+**Login issues**
+- Ensure backend is running and env vars are set
+- Check browser devtools console for errors
+- Verify DB seeded with provided SQL
+
+**More help**: See [SETUP.md](./SETUP.md) for detailed troubleshooting
 
 ## License
 Add your license here.

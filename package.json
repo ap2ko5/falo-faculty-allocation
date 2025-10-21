@@ -1,0 +1,31 @@
+{
+  "name": "falo-faculty-allocation",
+  "version": "1.0.0",
+  "description": "Faculty Allocation System - Full Stack Application",
+  "type": "module",
+  "scripts": {
+    "start": "node start.js",
+    "install:all": "npm install --prefix backend && npm install --prefix frontend",
+    "install:backend": "npm install --prefix backend",
+    "install:frontend": "npm install --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "start:backend": "npm start --prefix backend",
+    "start:frontend": "npm run dev --prefix frontend",
+    "build:frontend": "npm run build --prefix frontend",
+    "clean": "node -e \"const fs=require('fs');const path=require('path');['backend','frontend'].forEach(d=>{const nm=path.join(d,'node_modules');if(fs.existsSync(nm))fs.rmSync(nm,{recursive:true,force:true})})\"",
+    "setup": "npm run install:all && echo Setup complete! Create .env files in backend/ and frontend/ before running."
+  },
+  "keywords": [
+    "faculty",
+    "allocation",
+    "management",
+    "education"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}
