@@ -31,6 +31,10 @@ export default function Register() {
       setError('Passwords do not match');
       return;
     }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return;
+    }
     try {
       await authService.register(formData);
       navigate('/login');
@@ -81,6 +85,7 @@ export default function Register() {
               type="password"
               margin="normal"
               required
+              helperText="Minimum 6 characters"
               value={formData.password}
               onChange={(e) =>
                 setFormData({ ...formData, password: e.target.value })

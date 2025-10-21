@@ -17,7 +17,10 @@ export const authService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
     });
-    if (!response.ok) throw new Error('Registration failed');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Registration failed: ${response.status}`);
+    }
     return response.json();
   },
 
@@ -52,6 +55,24 @@ export const allocationService = {
     return response.json();
   },
 
+  approve: async (id) => {
+    const response = await fetch(`${API_URL}/allocations/${id}/approve`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to approve allocation');
+    return response.json();
+  },
+
+  reject: async (id) => {
+    const response = await fetch(`${API_URL}/allocations/${id}/reject`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to reject allocation');
+    return response.json();
+  },
+
   delete: async (id) => {
     const response = await fetch(`${API_URL}/allocations/${id}`, {
       method: 'DELETE',
@@ -62,28 +83,112 @@ export const allocationService = {
   },
 };
 
-export const timetableService = {
+export const facultyService = {
   getAll: async () => {
-    const response = await fetch(`${API_URL}/timetable`, {
+    const response = await fetch(`${API_URL}/faculty`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
-    if (!response.ok) throw new Error('Failed to fetch timetable');
+    if (!response.ok) throw new Error('Failed to fetch faculty');
     return response.json();
   },
 
-  getByClass: async (classId) => {
-    const response = await fetch(`${API_URL}/timetable/class/${classId}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+  create: async (facultyData) => {
+    const response = await fetch(`${API_URL}/faculty`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(facultyData),
     });
-    if (!response.ok) throw new Error('Failed to fetch class timetable');
+    if (!response.ok) throw new Error('Failed to create faculty');
     return response.json();
   },
 
-  getByFaculty: async (facultyId) => {
-    const response = await fetch(`${API_URL}/timetable/faculty/${facultyId}`, {
+  update: async (id, facultyData) => {
+    const response = await fetch(`${API_URL}/faculty/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(facultyData),
+    });
+    if (!response.ok) throw new Error('Failed to update faculty');
+    return response.json();
+  },
+
+  delete: async (id) => {
+    const response = await fetch(`${API_URL}/faculty/${id}`, {
+      method: 'DELETE',
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
     });
-    if (!response.ok) throw new Error('Failed to fetch faculty timetable');
+    if (!response.ok) throw new Error('Failed to delete faculty');
+    return response.json();
+  },
+};
+
+export const courseService = {
+  getAll: async () => {
+    const response = await fetch(`${API_URL}/courses`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch courses');
+    return response.json();
+  },
+
+  create: async (courseData) => {
+    const response = await fetch(`${API_URL}/courses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(courseData),
+    });
+    if (!response.ok) throw new Error('Failed to create course');
+    return response.json();
+  },
+
+  update: async (id, courseData) => {
+    const response = await fetch(`${API_URL}/courses/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+      },
+      body: JSON.stringify(courseData),
+    });
+    if (!response.ok) throw new Error('Failed to update course');
+    return response.json();
+  },
+
+  delete: async (id) => {
+    const response = await fetch(`${API_URL}/courses/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to delete course');
+    return response.json();
+  },
+};
+
+export const departmentService = {
+  getAll: async () => {
+    const response = await fetch(`${API_URL}/departments`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch departments');
+    return response.json();
+  },
+};
+
+export const classService = {
+  getAll: async () => {
+    const response = await fetch(`${API_URL}/classes`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    if (!response.ok) throw new Error('Failed to fetch classes');
     return response.json();
   },
 };

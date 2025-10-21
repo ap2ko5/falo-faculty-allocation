@@ -15,6 +15,15 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  IconButton,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Divider,
 } from '@mui/material';
 import {
   School as SchoolIcon,
@@ -22,9 +31,14 @@ import {
   Comment as CommentIcon,
   Logout as LogoutIcon,
   NotificationsActive as NotificationIcon,
+  Assignment as AssignmentIcon,
+  Feedback as FeedbackIcon,
+  CheckCircle as CheckCircleIcon,
+  Pending as PendingIcon,
+  Cancel as CancelIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { allocationService, timetableService } from '../../services/api';
+import { allocationService } from '../../services/api';
 import DashboardLayout from '../dashboard/DashboardLayout';
 
 const FacultyDashboard = ({ onLogout, user }) => {
@@ -33,7 +47,6 @@ const FacultyDashboard = ({ onLogout, user }) => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [openDialog, setOpenDialog] = useState(false);
   const [queryForm, setQueryForm] = useState({ subject: '', message: '' });
-  const [nextClass, setNextClass] = useState(null);
   const [allocations, setAllocations] = useState([]);
 
   useEffect(() => {
@@ -43,21 +56,15 @@ const FacultyDashboard = ({ onLogout, user }) => {
   const fetchUserData = async () => {
     setLoading(true);
     try {
-      // Fetch next class
-      const timetableData = await timetableService.getByFaculty(user.id);
-      const now = new Date();
-      setNextClass(timetableData.find(slot => {
-        const [hours, minutes] = slot.time.split(':');
-        const slotTime = new Date();
-        slotTime.setHours(parseInt(hours), parseInt(minutes));
-        return slotTime > now;
-      }));
-
       // Fetch allocations
       const allocationsData = await allocationService.getAll();
-      setAllocations(allocationsData.filter(a => a.facultyId === user.id));
+      // Filter allocations for current faculty user
+      const userAllocations = allocationsData.filter(a => a.faculty_id === user?.id);
+      console.log('Faculty allocations:', userAllocations);
+      setAllocations(userAllocations);
     } catch (error) {
-      setSnackbar({ open: true, message: error.message, severity: 'error' });
+      console.error('Error fetching allocations:', error);
+      setSnackbar({ open: true, message: 'Failed to fetch allocations', severity: 'error' });
     } finally {
       setLoading(false);
     }
@@ -82,118 +89,206 @@ const FacultyDashboard = ({ onLogout, user }) => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const InfoCard = ({ title, content, icon: Icon, color = "primary" }) => (
-    <Card
+  const getStatusColor = (status) => {
+    const statusLower = (status || 'active').toLowerCase();
+    if (statusLower === 'pending') return 'warning';
+    if (statusLower === 'approved' || statusLower === 'active') return 'success';
+    if (statusLower === 'rejected') return 'error';
+    return 'default';
+  };
+
+  const getStatusIcon = (status) => {
+    const statusLower = (status || 'active').toLowerCase();
+    if (statusLower === 'pending') return <PendingIcon fontSize="small" />;
+    if (statusLower === 'approved' || statusLower === 'active') return <CheckCircleIcon fontSize="small" />;
+    if (statusLower === 'rejected') return <CancelIcon fontSize="small" />;
+    return null;
+  };
+
+  const ActionButton = ({ icon: Icon, color, onClick, children }) => (
+    <Button
+      variant="contained"
+      color={color}
+      onClick={onClick}
+      startIcon={<Icon sx={{ fontSize: 24 }} />}
+      fullWidth
       sx={{
-        height: '100%',
-        borderLeft: 4,
-        borderColor: `${color}.main`,
+        py: 2,
+        fontSize: '1rem',
+        fontWeight: 600,
+        textTransform: 'none',
+        transition: 'transform 0.2s',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: 4,
-          transition: 'all 0.3s ease',
-        },
+          transform: 'translateY(-2px)',
+        }
       }}
     >
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Icon sx={{ color: `${color}.main`, mr: 1 }} />
-          <Typography variant="h6" component="div" color={`${color}.main`}>
-            {title}
-          </Typography>
-        </Box>
-        <Typography variant="body1">{content}</Typography>
-      </CardContent>
-    </Card>
+      {children}
+    </Button>
   );
 
   const ActionCard = ({ title, description, icon: Icon, color = "primary", onClick }) => (
     <Card
       sx={{
         height: '100%',
-        cursor: 'pointer',
+        minHeight: 220,
+        display: 'flex',
+        flexDirection: 'column',
+        transition: 'transform 0.2s, box-shadow 0.2s',
         '&:hover': {
           transform: 'translateY(-4px)',
-          boxShadow: 4,
-          transition: 'all 0.3s ease',
+          boxShadow: 8,
         },
       }}
-      onClick={onClick}
     >
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Icon sx={{ color: `${color}.main`, fontSize: 40, mr: 2 }} />
-          <Box>
-            <Typography variant="h6" component="div">
-              {title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {description}
-            </Typography>
-          </Box>
+      <CardContent sx={{ p: 3, pb: '24px !important', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
+          <IconButton
+            sx={{
+              bgcolor: `${color}.light`,
+              color: `${color}.main`,
+              mr: 2,
+              width: 56,
+              height: 56,
+              '&:hover': { bgcolor: `${color}.light` },
+            }}
+          >
+            <Icon sx={{ fontSize: 32 }} />
+          </IconButton>
+          <Typography variant="h5" component="div" fontWeight={600}>
+            {title}
+          </Typography>
         </Box>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, flexGrow: 1, fontSize: '0.95rem' }}>
+          {description}
+        </Typography>
+        <ActionButton icon={Icon} color={color} onClick={onClick}>
+          {title}
+        </ActionButton>
       </CardContent>
     </Card>
   );
 
   return (
     <DashboardLayout role="faculty">
-      <Box sx={{ position: 'relative' }}>
-        <Typography variant="h4" gutterBottom>
-          Welcome, {user?.username || 'Faculty'}
+      <Box sx={{ position: 'relative', p: 2 }}>
+        <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+          Welcome, {user?.name || 'Faculty'}
         </Typography>
 
-        <Grid container spacing={3}>
-          {/* Status Cards */}
-          <Grid item xs={12} md={6}>
-            <InfoCard
-              title="Next Class"
-              content={nextClass ? `${nextClass.course} at ${nextClass.time}` : 'No upcoming classes'}
-              icon={SchoolIcon}
-              color="primary"
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <InfoCard
-              title="Current Allocations"
-              content={`${allocations.length} courses assigned`}
-              icon={NotificationIcon}
-              color="secondary"
-            />
-          </Grid>
+        {/* My Allocations Section */}
+        {allocations.length > 0 && (
+          <Paper elevation={3} sx={{ mb: 4, p: 3, borderRadius: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <AssignmentIcon sx={{ fontSize: 32, mr: 1.5, color: 'primary.main' }} />
+              <Typography variant="h5" component="h2" fontWeight={600}>
+                My Current Allocations
+              </Typography>
+            </Box>
+            <Divider sx={{ mb: 2 }} />
+            
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Course</strong></TableCell>
+                      <TableCell><strong>Class</strong></TableCell>
+                      <TableCell><strong>Semester</strong></TableCell>
+                      <TableCell><strong>Academic Year</strong></TableCell>
+                      <TableCell><strong>Status</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {allocations.map((allocation) => (
+                      <TableRow 
+                        key={allocation.id}
+                        sx={{ '&:hover': { bgcolor: 'action.hover' } }}
+                      >
+                        <TableCell>
+                          <Typography variant="body2" fontWeight={500}>
+                            {allocation.course?.name || allocation.course?.title || `Course #${allocation.course_id}`}
+                          </Typography>
+                          {allocation.course?.code && (
+                            <Typography variant="caption" color="text.secondary">
+                              {allocation.course.code}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {allocation.class?.display_name || 
+                           allocation.class?.name || 
+                           `Class #${allocation.class_id}`}
+                        </TableCell>
+                        <TableCell>{allocation.semester}</TableCell>
+                        <TableCell>{allocation.academic_year}</TableCell>
+                        <TableCell>
+                          <Chip
+                            icon={getStatusIcon(allocation.status)}
+                            label={allocation.status || 'active'}
+                            color={getStatusColor(allocation.status)}
+                            size="small"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+            
+            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Total Allocations: <strong>{allocations.length}</strong>
+              </Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => navigate('/allocations')}
+                startIcon={<AssignmentIcon />}
+              >
+                View All Details
+              </Button>
+            </Box>
+          </Paper>
+        )}
 
-          {/* Action Cards */}
-          <Grid item xs={12} md={6}>
+        {/* No Allocations Message */}
+        {allocations.length === 0 && !loading && (
+          <Alert severity="info" sx={{ mb: 4 }}>
+            <Typography variant="body1">
+              You currently have no course allocations. You can submit preferences from the <strong>My Allocations</strong> page.
+            </Typography>
+          </Alert>
+        )}
+
+        <Grid container spacing={4}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
               title="My Allocations"
-              description="View your current course assignments"
-              icon={SchoolIcon}
-              color="info"
+              description="View and manage your current course assignments"
+              icon={AssignmentIcon}
+              color="primary"
               onClick={() => navigate('/allocations')}
             />
           </Grid>
-          <Grid item xs={12} md={6}>
-            <ActionCard
-              title="My Timetable"
-              description="Check your weekly schedule"
-              icon={ScheduleIcon}
-              color="success"
-              onClick={() => navigate('/timetable')}
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
               title="Submit Query"
-              description="Send a request or feedback to admin"
-              icon={CommentIcon}
-              color="warning"
+              description="Send feedback or inquiries to the admin"
+              icon={FeedbackIcon}
+              color="success"
               onClick={() => setOpenDialog(true)}
             />
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
               title="Logout"
-              description="Securely exit your account"
+              description="Securely exit the faculty dashboard"
               icon={LogoutIcon}
               color="error"
               onClick={onLogout}

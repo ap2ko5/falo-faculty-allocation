@@ -6,26 +6,24 @@ import { createCourseSchema, updateCourseSchema } from '../schemas/validation.js
 
 const router = express.Router();
 
-// Public routes
-router.get('/', courseController.getAll);
-
-// Protected routes
+// Protected routes - all authenticated users can view
 router.use(verifyToken);
 
-// Faculty and admin routes
+router.get('/', courseController.getAll);
 router.get('/department/:did', courseController.getByDepartment);
 router.get('/:id', courseController.getById);
 
 // Admin only routes
-router.use(isAdmin);
 router.post('/', 
+  isAdmin,
   validateBody(createCourseSchema),
   courseController.create
 );
-router.put('/:id', 
+router.put('/:id',
+  isAdmin,
   validateBody(updateCourseSchema),
   courseController.update
 );
-router.delete('/:id', courseController.delete);
+router.delete('/:id', isAdmin, courseController.delete);
 
 export default router;

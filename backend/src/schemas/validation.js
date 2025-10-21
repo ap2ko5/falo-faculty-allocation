@@ -2,16 +2,17 @@ import Joi from 'joi';
 
 // Auth schemas
 export const loginSchema = Joi.object({
-  email: Joi.string().email().required(),
+  username: Joi.string().required(),
   password: Joi.string().required()
 });
 
 export const registerSchema = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().email().required(),
+  username: Joi.string().required(),
   password: Joi.string().min(6).required(),
-  department_id: Joi.number().integer().required(),
+  confirmPassword: Joi.string().optional(),  // Allow but ignore on backend
   role: Joi.string().valid('faculty', 'admin').default('faculty'),
+  name: Joi.string(),
+  department_id: Joi.number().integer(),
   designation: Joi.string(),
   expertise: Joi.array().items(Joi.string()),
   preferences: Joi.array().items(Joi.string())
@@ -19,20 +20,22 @@ export const registerSchema = Joi.object({
 
 // Faculty schemas
 export const createFacultySchema = Joi.object({
-  name: Joi.string().required(),
-  email: Joi.string().email().required(),
+  username: Joi.string().required(),
   password: Joi.string().min(6).required(),
+  name: Joi.string(),
   department_id: Joi.number().integer().required(),
+  role: Joi.string().valid('faculty', 'admin'),
   designation: Joi.string(),
   expertise: Joi.array().items(Joi.string()),
   preferences: Joi.array().items(Joi.string())
 });
 
 export const updateFacultySchema = Joi.object({
-  name: Joi.string(),
-  email: Joi.string().email(),
+  username: Joi.string(),
   password: Joi.string().min(6),
+  name: Joi.string(),
   department_id: Joi.number().integer(),
+  role: Joi.string().valid('faculty', 'admin'),
   designation: Joi.string(),
   expertise: Joi.array().items(Joi.string()),
   preferences: Joi.array().items(Joi.string())
@@ -63,18 +66,11 @@ export const createAllocationSchema = Joi.object({
   class_id: Joi.number().integer().required(),
   course_id: Joi.number().integer().required(),
   academic_year: Joi.number().integer().required(),
-  semester: Joi.number().integer().min(1).max(8).required()
+  semester: Joi.number().integer().min(1).max(8).required(),
+  status: Joi.string().valid('pending', 'approved', 'rejected').optional()
 });
 
 export const autoAllocateSchema = Joi.object({
   academic_year: Joi.number().integer().required(),
   semester: Joi.number().integer().min(1).max(8).required()
-});
-
-// Timetable schemas
-export const createTimetableSchema = Joi.object({
-  allocation_id: Joi.number().integer().required(),
-  day_of_week: Joi.number().integer().min(1).max(5).required(),
-  time_slot: Joi.number().integer().min(1).max(8).required(),
-  room_number: Joi.string().required()
 });

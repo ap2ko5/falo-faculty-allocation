@@ -23,8 +23,4 @@ router.get('/courses',
   reportsController.getCourseReport
 );
 
-router.get('/timetable-conflicts',
-  reportsController.getTimetableConflicts
-);
-
 export default router;

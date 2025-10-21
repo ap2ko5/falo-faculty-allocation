@@ -31,11 +31,11 @@ INSERT INTO courses (id, code, name, department_id, semester, credits, required_
 
 -- Insert Classes (CSE)
 INSERT INTO classes (id, name, department_id, batch_year, semester, section) VALUES
-('cl001', 'S3 CSE A', 'd001', 2025, 3, 'A'),
-('cl002', 'S3 CSE B', 'd001', 2025, 3, 'B'),
-('cl003', 'S5 CSE A', 'd001', 2024, 5, 'A'),
-('cl004', 'S5 CSE B', 'd001', 2024, 5, 'B'),
-('cl005', 'S7 CSE A', 'd001', 2023, 7, 'A');
+('cl001', 'CSEA', 'd001', 2025, 3, 'A'),
+('cl002', 'CSEB', 'd001', 2025, 3, 'B'),
+('cl003', 'CSEA', 'd001', 2024, 5, 'A'),
+('cl004', 'CSEB', 'd001', 2024, 5, 'B'),
+('cl005', 'CSEA', 'd001', 2023, 7, 'A');
 
 -- Insert Allocation Windows
 INSERT INTO allocation_windows (id, department_id, start_date, end_date, year, semester, status) VALUES

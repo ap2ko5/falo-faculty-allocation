@@ -20,7 +20,7 @@ import {
   Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { allocationService, timetableService } from '../../services/api';
+import { allocationService } from '../../services/api';
 import DashboardLayout from '../dashboard/DashboardLayout';
 
 const AdminDashboard = ({ onLogout }) => {
@@ -40,18 +40,6 @@ const AdminDashboard = ({ onLogout }) => {
     }
   };
 
-  const handleGenerateTimetable = async () => {
-    setLoading(true);
-    try {
-      await timetableService.generate();
-      setSnackbar({ open: true, message: 'Timetable generated successfully!', severity: 'success' });
-    } catch (error) {
-      setSnackbar({ open: true, message: error.message, severity: 'error' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
@@ -61,10 +49,12 @@ const AdminDashboard = ({ onLogout }) => {
       variant="contained"
       color={color}
       onClick={onClick}
-      startIcon={<Icon />}
+      startIcon={<Icon sx={{ fontSize: 24 }} />}
       fullWidth
       sx={{
-        py: 1.5,
+        py: 2,
+        fontSize: '1rem',
+        fontWeight: 600,
         textTransform: 'none',
         transition: 'transform 0.2s',
         '&:hover': {
@@ -80,6 +70,7 @@ const AdminDashboard = ({ onLogout }) => {
     <Card
       sx={{
         height: '100%',
+        minHeight: 220,
         display: 'flex',
         flexDirection: 'column',
         transition: 'transform 0.2s, box-shadow 0.2s',
@@ -89,23 +80,25 @@ const AdminDashboard = ({ onLogout }) => {
         },
       }}
     >
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+      <CardContent sx={{ p: 3, pb: '24px !important', flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
           <IconButton
             sx={{
               bgcolor: `${color}.light`,
               color: `${color}.main`,
-              mr: 1,
+              mr: 2,
+              width: 56,
+              height: 56,
               '&:hover': { bgcolor: `${color}.light` },
             }}
           >
-            <Icon />
+            <Icon sx={{ fontSize: 32 }} />
           </IconButton>
-          <Typography variant="h6" component="div">
+          <Typography variant="h5" component="div" fontWeight={600}>
             {title}
           </Typography>
         </Box>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3, flexGrow: 1, fontSize: '0.95rem' }}>
           {description}
         </Typography>
         <ActionButton icon={Icon} color={color} onClick={onClick}>
@@ -117,45 +110,45 @@ const AdminDashboard = ({ onLogout }) => {
 
   return (
     <DashboardLayout role="admin">
-      <Box sx={{ position: 'relative' }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={6} lg={4}>
+      <Box sx={{ position: 'relative', p: 2 }}>
+        <Grid container spacing={4}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
-              title="Run Auto Allocation"
-              description="Automatically allocate faculty to courses based on availability and expertise"
-              icon={AutoFixIcon}
+              title="Manage Faculty"
+              description="Add, edit, and view all faculty members"
+              icon={GroupIcon}
               color="primary"
-              onClick={handleAutoAllocation}
+              onClick={() => navigate('/faculty')}
             />
           </Grid>
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
-              title="Generate Timetable"
-              description="Create optimized class schedules avoiding conflicts"
+              title="Manage Courses"
+              description="Add, edit, and view all courses"
               icon={ScheduleIcon}
               color="secondary"
-              onClick={handleGenerateTimetable}
+              onClick={() => navigate('/courses')}
             />
           </Grid>
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
               title="View Allocations"
               description="Review and manage current faculty allocations"
-              icon={GroupIcon}
+              icon={CalendarIcon}
               color="info"
               onClick={() => navigate('/allocations')}
             />
           </Grid>
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
-              title="View Timetable"
-              description="Check complete timetable by class or faculty"
-              icon={CalendarIcon}
+              title="Run Auto Allocation"
+              description="Automatically allocate faculty to courses"
+              icon={AutoFixIcon}
               color="success"
-              onClick={() => navigate('/timetable')}
+              onClick={handleAutoAllocation}
             />
           </Grid>
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
               title="Manage Windows"
               description="Control allocation periods and deadlines"
@@ -164,7 +157,7 @@ const AdminDashboard = ({ onLogout }) => {
               onClick={() => navigate('/windows')}
             />
           </Grid>
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} sm={6} lg={4}>
             <ActionCard
               title="Logout"
               description="Securely exit the admin dashboard"

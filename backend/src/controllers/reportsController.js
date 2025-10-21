@@ -5,45 +5,45 @@ const reportsController = {
   getAllocationStats: async (req, res) => {
     try {
       // Get all allocations with related data
-      const { rows } = await db.query(`
-        SELECT a.id,
-               f.name as faculty_name,
-               f.department_id,
-               d.name as department_name,
-               c.name as course_name,
-               cl.semester,
-               cl.section
-        FROM allocations a
-        JOIN faculty f ON a.faculty_id = f.id
-        JOIN departments d ON f.department_id = d.id
-        JOIN courses c ON a.course_id = c.id
-        JOIN classes cl ON a.class_id = cl.id
-      `);
+      const { data: allocations, error } = await supabase
+        .from('allocations')
+        .select(`
+          id,
+          faculty:faculty_id (
+            name,
+            department_id,
+            departments (name)
+          ),
+          courses:course_id (name),
+          classes:class_id (semester, section)
+        `);
+
+      if (error) throw error;
 
       // Calculate statistics
       const stats = {
-        total_allocations: rows.length,
+        total_allocations: allocations.length,
         by_department: {},
         by_faculty: {},
         by_semester: {},
         course_distribution: {},
       };
 
-      rows.forEach(allocation => {
+      allocations.forEach(allocation => {
         // Department stats
-        const dept = allocation.department_name || 'Unknown';
+        const dept = allocation.faculty?.departments?.name || 'Unknown';
         stats.by_department[dept] = (stats.by_department[dept] || 0) + 1;
 
         // Faculty stats
-        const faculty = allocation.faculty_name || 'Unknown';
+        const faculty = allocation.faculty?.name || 'Unknown';
         stats.by_faculty[faculty] = (stats.by_faculty[faculty] || 0) + 1;
 
         // Semester stats
-        const semester = allocation.semester || 'Unknown';
+        const semester = allocation.classes?.semester || 'Unknown';
         stats.by_semester[semester] = (stats.by_semester[semester] || 0) + 1;
 
         // Course stats
-        const course = allocation.course_name || 'Unknown';
+        const course = allocation.courses?.name || 'Unknown';
         stats.course_distribution[course] = (stats.course_distribution[course] || 0) + 1;
       });
 
@@ -56,23 +56,49 @@ const reportsController = {
   // Get faculty workload report
   getFacultyWorkload: async (req, res) => {
     try {
-      const { rows } = await db.query(`
-        SELECT f.id,
-               f.name as faculty_name,
-               f.designation,
-               d.name as department_name,
-               COUNT(DISTINCT a.id) as total_courses,
-               SUM(c.credits) as total_credits,
-               ARRAY_AGG(DISTINCT c.name) as courses
-        FROM faculty f
-        LEFT JOIN departments d ON f.department_id = d.id
-        LEFT JOIN allocations a ON f.id = a.faculty_id
-        LEFT JOIN courses c ON a.course_id = c.id
-        GROUP BY f.id, f.name, f.designation, d.name
-        ORDER BY f.name
-      `);
+      const { data: faculty, error: facultyError } = await supabase
+        .from('faculty')
+        .select(`
+          id,
+          name,
+          designation,
+          departments (name)
+        `);
 
-      res.json(rows);
+      if (facultyError) throw facultyError;
+
+      const workloadData = [];
+
+      for (const f of faculty) {
+        const { data: allocations, error: allocError } = await supabase
+          .from('allocations')
+          .select(`
+            id,
+            courses (
+              name,
+              credits
+            )
+          `)
+          .eq('faculty_id', f.id);
+
+        if (allocError) throw allocError;
+
+        const total_courses = allocations.length;
+        const total_credits = allocations.reduce((sum, a) => sum + (a.courses?.credits || 0), 0);
+        const courses = allocations.map(a => a.courses?.name).filter(Boolean);
+
+        workloadData.push({
+          id: f.id,
+          faculty_name: f.name,
+          designation: f.designation,
+          department_name: f.departments?.name,
+          total_courses,
+          total_credits,
+          courses
+        });
+      }
+
+      res.json(workloadData);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -81,26 +107,57 @@ const reportsController = {
   // Get department-wise allocation report
   getDepartmentReport: async (req, res) => {
     try {
-      const { rows } = await db.query(`
-        SELECT d.id,
-               d.name as department_name,
-               COUNT(DISTINCT f.id) as total_faculty,
-               COUNT(DISTINCT c.id) as total_courses,
-               COUNT(DISTINCT a.id) as total_allocations,
-               AVG(
-                 (SELECT COUNT(*) 
-                  FROM allocations a2 
-                  WHERE a2.faculty_id = f.id)
-               )::numeric(10,2) as avg_courses_per_faculty
-        FROM departments d
-        LEFT JOIN faculty f ON d.id = f.department_id
-        LEFT JOIN courses c ON d.id = c.department_id
-        LEFT JOIN allocations a ON f.id = a.faculty_id
-        GROUP BY d.id, d.name
-        ORDER BY d.name
-      `);
+      const { data: departments, error: deptError } = await supabase
+        .from('departments')
+        .select('id, name');
 
-      res.json(rows);
+      if (deptError) throw deptError;
+
+      const reportData = [];
+
+      for (const dept of departments) {
+        const { data: faculty, error: facError } = await supabase
+          .from('faculty')
+          .select('id')
+          .eq('department_id', dept.id);
+
+        if (facError) throw facError;
+
+        const { data: courses, error: courseError } = await supabase
+          .from('courses')
+          .select('id')
+          .eq('department_id', dept.id);
+
+        if (courseError) throw courseError;
+
+        const facultyIds = faculty.map(f => f.id);
+        
+        let total_allocations = 0;
+        if (facultyIds.length > 0) {
+          const { count, error: allocError } = await supabase
+            .from('allocations')
+            .select('id', { count: 'exact', head: true })
+            .in('faculty_id', facultyIds);
+
+          if (allocError) throw allocError;
+          total_allocations = count || 0;
+        }
+
+        const avg_courses_per_faculty = faculty.length > 0 
+          ? (total_allocations / faculty.length).toFixed(2) 
+          : '0.00';
+
+        reportData.push({
+          id: dept.id,
+          department_name: dept.name,
+          total_faculty: faculty.length,
+          total_courses: courses.length,
+          total_allocations,
+          avg_courses_per_faculty: parseFloat(avg_courses_per_faculty)
+        });
+      }
+
+      res.json(reportData);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -109,65 +166,48 @@ const reportsController = {
   // Get course allocation report
   getCourseReport: async (req, res) => {
     try {
-      const { rows } = await db.query(`
-        SELECT c.id,
-               c.code,
-               c.name as course_name,
-               c.semester,
-               c.credits,
-               d.name as department_name,
-               COUNT(DISTINCT a.id) as total_allocations,
-               COUNT(DISTINCT f.id) as unique_faculty_count,
-               ARRAY_AGG(DISTINCT f.name) as faculty_assigned
-        FROM courses c
-        LEFT JOIN departments d ON c.department_id = d.id
-        LEFT JOIN allocations a ON c.id = a.course_id
-        LEFT JOIN faculty f ON a.faculty_id = f.id
-        GROUP BY c.id, c.code, c.name, c.semester, c.credits, d.name
-        ORDER BY c.semester, c.code
-      `);
+      const { data: courses, error: courseError } = await supabase
+        .from('courses')
+        .select(`
+          id,
+          code,
+          name,
+          semester,
+          credits,
+          departments (name)
+        `);
 
-      res.json(rows);
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
+      if (courseError) throw courseError;
 
-  // Get timetable conflicts report
-  getTimetableConflicts: async (req, res) => {
-    try {
-      const { rows } = await db.query(`
-        WITH conflicts AS (
-          SELECT t1.id as conflict_id,
-                 t1.day_of_week,
-                 t1.time_slot,
-                 t1.room_number,
-                 f1.name as faculty1_name,
-                 c1.code as course1_code,
-                 cl1.section as class1_section,
-                 f2.name as faculty2_name,
-                 c2.code as course2_code,
-                 cl2.section as class2_section
-          FROM timetable t1
-          JOIN allocations a1 ON t1.allocation_id = a1.id
-          JOIN faculty f1 ON a1.faculty_id = f1.id
-          JOIN courses c1 ON a1.course_id = c1.id
-          JOIN classes cl1 ON a1.class_id = cl1.id
-          JOIN timetable t2 ON t1.day_of_week = t2.day_of_week 
-                          AND t1.time_slot = t2.time_slot
-                          AND t1.id < t2.id
-          JOIN allocations a2 ON t2.allocation_id = a2.id
-          JOIN faculty f2 ON a2.faculty_id = f2.id
-          JOIN courses c2 ON a2.course_id = c2.id
-          JOIN classes cl2 ON a2.class_id = cl2.id
-          WHERE t1.room_number = t2.room_number
-             OR a1.faculty_id = a2.faculty_id
-        )
-        SELECT * FROM conflicts
-        ORDER BY day_of_week, time_slot
-      `);
+      const reportData = [];
 
-      res.json(rows);
+      for (const course of courses) {
+        const { data: allocations, error: allocError } = await supabase
+          .from('allocations')
+          .select(`
+            id,
+            faculty:faculty_id (name)
+          `)
+          .eq('course_id', course.id);
+
+        if (allocError) throw allocError;
+
+        const uniqueFaculty = [...new Set(allocations.map(a => a.faculty?.name).filter(Boolean))];
+
+        reportData.push({
+          id: course.id,
+          code: course.code,
+          course_name: course.name,
+          semester: course.semester,
+          credits: course.credits,
+          department_name: course.departments?.name,
+          total_allocations: allocations.length,
+          unique_faculty_count: uniqueFaculty.length,
+          faculty_assigned: uniqueFaculty
+        });
+      }
+
+      res.json(reportData);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }

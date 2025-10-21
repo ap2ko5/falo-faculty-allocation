@@ -24,6 +24,10 @@ export const config = {
 // Database initialization function
 export const initializeDatabase = async () => {
   try {
+    if (process.env.SKIP_DB_CHECK === 'true') {
+      console.log('⏭️  SKIP_DB_CHECK enabled — skipping Supabase connection test');
+      return true;
+    }
     console.log('🔄 Testing Supabase connection...');
 
     // Test connection

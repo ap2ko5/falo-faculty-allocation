@@ -30,13 +30,6 @@ export default function Dashboard() {
       color: '#1976d2',
     },
     {
-      title: 'Timetable',
-      description: 'View and manage class timetables',
-      icon: ScheduleIcon,
-      action: () => navigate('/timetable'),
-      color: '#2e7d32',
-    },
-    {
       title: 'Classes',
       description: 'Manage class information',
       icon: ClassIcon,
