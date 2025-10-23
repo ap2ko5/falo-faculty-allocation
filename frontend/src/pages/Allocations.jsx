@@ -143,7 +143,6 @@ export default function Allocations({ user }) {
   ];
 
   useEffect(() => {
-    // Load reference data first, then allocations
     const loadRefData = async () => {
       try {
         const [f, c, cl] = await Promise.all([
@@ -158,7 +157,6 @@ export default function Allocations({ user }) {
         });
         console.log('Classes data:', cl);
         
-        // Sort all arrays alphabetically
         const sortedFaculties = (f || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const sortedCourses = (c || []).sort((a, b) => (a.name || a.title || '').localeCompare(b.name || b.title || ''));
         const sortedClasses = (cl || []).sort((a, b) => {
@@ -171,7 +169,6 @@ export default function Allocations({ user }) {
         setCourses(sortedCourses);
         setClasses(sortedClasses);
       } catch (e) {
-        // Not fatal for page render; will show IDs if names unavailable
         console.error('Failed to load reference data', e);
         setError('Warning: Could not load reference data. Showing IDs instead of names.');
       } finally {
@@ -197,7 +194,6 @@ export default function Allocations({ user }) {
     e.preventDefault();
     setError('');
     
-    // Validation
     if (isFaculty && !user?.id) {
       setError('User information not available. Please refresh the page and try again.');
       return;
@@ -237,7 +233,6 @@ export default function Allocations({ user }) {
       fetchAllocations();
       
       if (isFaculty) {
-        // Show success message for faculty preference submission
         setTimeout(() => {
           setError('Preference submitted successfully! Waiting for admin approval.');
         }, 100);
@@ -260,26 +255,26 @@ export default function Allocations({ user }) {
   };
 
   const handleOpenDialog = () => {
-    // Check if user data is available for faculty users
     if (isFaculty && !user?.id) {
       setError('User information not loaded. Please refresh the page and try again.');
       return;
     }
-    setError(''); // Clear any previous errors
+    setError('');
     setOpenDialog(true);
   };
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'center' }}>
-        <Box>
-          <Typography variant="h4" component="h1" className="page-title">
-            {isFaculty ? 'My Allocation Preferences' : 'Faculty Allocations'}
-          </Typography>
-          <Typography variant="body2" className="page-subtitle muted">
-            {isFaculty ? 'Submit your preferred classes. Admin will review.' : 'Manage faculty allocations and approvals.'}
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 3, textAlign: 'center' }}>
+        <Typography variant="h4" component="h1" className="page-title" gutterBottom>
+          {isFaculty ? 'My Allocation Preferences' : 'Faculty Allocations'}
+        </Typography>
+        <Typography variant="body2" className="page-subtitle muted">
+          {isFaculty ? 'Submit your preferred classes. Admin will review.' : 'Manage faculty allocations and approvals.'}
+        </Typography>
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
 
         <Button
           variant="contained"
@@ -299,12 +294,10 @@ export default function Allocations({ user }) {
       <Paper className="card-section" sx={{ height: 520, width: '100%', p: 0 }}>
         <DataGrid
           rows={allocations.map((a, index) => {
-            // First try to use joined data from backend, fallback to local lookup
             const faculty = a.faculty || faculties.find((f) => f.id === a.faculty_id);
             const course = a.course || courses.find((c) => c.id === a.course_id);
             const klass = a.class || classes.find((cl) => cl.id === a.class_id);
             
-            // Debug logging for first row
             if (index === 0) {
               console.log('First allocation mapping:', {
                 allocation: a,
@@ -317,7 +310,6 @@ export default function Allocations({ user }) {
               });
             }
             
-            // Build class name
             let className = '';
             if (klass?.section) {
               className = klass.section;
@@ -327,7 +319,6 @@ export default function Allocations({ user }) {
               className = `#${a.class_id}`;
             }
             
-            // Build course details: "Course Name - Section - Semester X"
             const courseName = course?.name || course?.title || `Course #${a.course_id}`;
             const courseDetails = `${courseName} - ${className} - Sem ${a.semester}`;
             

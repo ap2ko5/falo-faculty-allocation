@@ -4,13 +4,11 @@ import { supabase } from '../config/database.js';
 
 const router = express.Router();
 
-// Protected routes
 router.use(verifyToken);
 
-// Get all classes
 router.get('/', async (req, res) => {
   try {
-    const baseSelect = `
+    const baseQuerySelect = `
         id,
         semester,
         section,
@@ -23,16 +21,17 @@ router.get('/', async (req, res) => {
         )
       `.trim();
 
-    let { data, error } = await supabase
+    let { data: classList, error: queryError } = await supabase
       .from('classes')
-      .select(baseSelect)
+      .select(baseQuerySelect)
       .order('semester')
       .order('section');
 
-    // Older databases may not have a department.code column; retry without it
-  if (error && /code\s+does\s+not\s+exist/i.test(error.message)) {
+    const isDepartmentCodeMissingError = queryError && /code\s+does\s+not\s+exist/i.test(queryError.message);
+    
+    if (isDepartmentCodeMissingError) {
       console.warn('Department code column missing; retrying without code field');
-      const fallbackSelect = `
+      const fallbackQuerySelect = `
         id,
         semester,
         section,
@@ -44,37 +43,40 @@ router.get('/', async (req, res) => {
         )
       `.trim();
 
-      const fallback = await supabase
+      const fallbackQuery = await supabase
         .from('classes')
-        .select(fallbackSelect)
+        .select(fallbackQuerySelect)
         .order('semester')
         .order('section');
 
-      data = fallback.data;
-      error = fallback.error;
+      classList = fallbackQuery.data;
+      queryError = fallbackQuery.error;
     }
 
-    if (error) {
-      console.error('Supabase error fetching classes:', error);
-      throw error;
+    if (queryError) {
+      console.error('Supabase error fetching classes:', queryError);
+      throw new Error(`Failed to query classes: ${queryError.message}`);
     }
 
-    const formatted = (data || []).map((cl) => {
-      const deptLabel = cl?.department?.code || cl?.department?.name || 'Department';
-      const sectionLabel = cl?.section ? cl.section.toString().trim() : '';
-      const classLabel = [deptLabel, sectionLabel].filter(Boolean).join(' ');
+    const formattedClassList = (classList || []).map((classItem) => {
+      const departmentLabel = classItem?.department?.code || classItem?.department?.name || 'Department';
+      const sectionLabel = classItem?.section ? classItem.section.toString().trim() : '';
+      const classIdentifier = [departmentLabel, sectionLabel].filter(Boolean).join(' ');
 
       return {
-        ...cl,
-        departments: cl.department,
-        display_name: `${classLabel} - Semester ${cl.semester}`,
+        ...classItem,
+        departments: classItem.department,
+        display_name: `${classIdentifier} - Semester ${classItem.semester}`,
       };
     });
 
-    res.json(formatted);
+    res.json(formattedClassList);
   } catch (error) {
     console.error('Error fetching classes:', error);
-    res.status(500).json({ error: 'Failed to fetch classes', details: error.message });
+    res.status(500).json({ 
+      error: 'Failed to fetch classes', 
+      details: error.message 
+    });
   }
 });
 

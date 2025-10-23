@@ -4,7 +4,6 @@ import { verifyToken, isAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes are admin only
 router.use(verifyToken, isAdmin);
 
 router.get('/allocation-stats',

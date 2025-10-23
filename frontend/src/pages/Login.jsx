@@ -13,21 +13,26 @@ import { authService } from '../services/api';
 
 export default function Login({ onLogin }) {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [loginCredentials, setLoginCredentials] = useState({
     username: '',
     password: '',
   });
-  const [error, setError] = useState('');
+  const [loginError, setLoginError] = useState('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleLoginSubmit = async (formSubmitEvent) => {
+    formSubmitEvent.preventDefault();
+    setLoginError('');
+    
     try {
-      const response = await authService.login(formData);
-      localStorage.setItem('token', response.token);
-      onLogin(response.user);
+      const authenticationResponse = await authService.login(loginCredentials);
+      const { token: authToken, user: authenticatedUser } = authenticationResponse;
+      
+      localStorage.setItem('token', authToken);
+      onLogin(authenticatedUser);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      const errorMessage = err.response?.data?.details || err.message || 'Login failed. Please try again.';
+      setLoginError(errorMessage);
     }
   };
 
@@ -38,20 +43,20 @@ export default function Login({ onLogin }) {
           <Typography variant="h4" component="h1" gutterBottom align="center">
             Login to FALO
           </Typography>
-          {error && (
+          {loginError && (
             <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
+              {loginError}
             </Alert>
           )}
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleLoginSubmit}>
             <TextField
               fullWidth
               label="Username"
               margin="normal"
               required
-              value={formData.username}
+              value={loginCredentials.username}
               onChange={(e) =>
-                setFormData({ ...formData, username: e.target.value })
+                setLoginCredentials({ ...loginCredentials, username: e.target.value })
               }
             />
             <TextField
@@ -60,9 +65,9 @@ export default function Login({ onLogin }) {
               type="password"
               margin="normal"
               required
-              value={formData.password}
+              value={loginCredentials.password}
               onChange={(e) =>
-                setFormData({ ...formData, password: e.target.value })
+                setLoginCredentials({ ...loginCredentials, password: e.target.value })
               }
             />
             <Button

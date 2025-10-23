@@ -46,11 +46,9 @@ export default function Courses() {
       headerName: 'Department', 
       width: 180,
       valueGetter: (params) => {
-        // Check if row and departments exist
         if (!params.row || !params.row.departments) {
           return 'N/A';
         }
-        // Use the nested department name from the API response
         return params.row.departments.name || 'N/A';
       }
     },
@@ -102,7 +100,6 @@ export default function Courses() {
         departmentService.getAll(),
       ]);
       setCourses(coursesData);
-      // Sort departments alphabetically
       const sortedDepts = (deptData || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setDepartments(sortedDepts);
     } catch (err) {
@@ -180,10 +177,11 @@ export default function Courses() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" component="h1" align="center" gutterBottom sx={{ mb: 3 }}>
+        Course Management
+      </Typography>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Course Management
-        </Typography>
+        <Box sx={{ flex: 1 }} />
         <Button
           variant="contained"
           startIcon={<AddIcon />}

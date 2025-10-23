@@ -56,9 +56,7 @@ const FacultyDashboard = ({ onLogout, user }) => {
   const fetchUserData = async () => {
     setLoading(true);
     try {
-      // Fetch allocations
       const allocationsData = await allocationService.getAll();
-      // Filter allocations for current faculty user
       const userAllocations = allocationsData.filter(a => a.faculty_id === user?.id);
       console.log('Faculty allocations:', userAllocations);
       setAllocations(userAllocations);
@@ -74,7 +72,6 @@ const FacultyDashboard = ({ onLogout, user }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // TODO: Implement query submission API
       setSnackbar({ open: true, message: 'Query submitted successfully!', severity: 'success' });
       setOpenDialog(false);
       setQueryForm({ subject: '', message: '' });
@@ -172,7 +169,7 @@ const FacultyDashboard = ({ onLogout, user }) => {
   return (
     <DashboardLayout role="faculty">
       <Box sx={{ position: 'relative', p: 2 }}>
-        <Typography variant="h4" gutterBottom sx={{ mb: 3 }}>
+        <Typography variant="h4" align="center" gutterBottom sx={{ mb: 3 }}>
           Welcome, {user?.name || 'Faculty'}
         </Typography>
 

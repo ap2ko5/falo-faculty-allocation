@@ -95,10 +95,10 @@ const WindowsManager = () => {
   return (
     <DashboardLayout role="admin">
       <Box sx={{ position: 'relative' }}>
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h4" component="h1">
-            Allocation Windows
-          </Typography>
+        <Typography variant="h4" component="h1" align="center" gutterBottom sx={{ mb: 3 }}>
+          Allocation Windows
+        </Typography>
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
           <Button
             variant="contained"
             startIcon={<AddIcon />}

@@ -1,11 +1,9 @@
 import { supabase } from '../config/database.js';
 
 const reportsController = {
-  // Get allocation statistics
   getAllocationStats: async (req, res) => {
     try {
-      // Get all allocations with related data
-      const { data: allocations, error } = await supabase
+      const { data: allAllocations, error } = await supabase
         .from('allocations')
         .select(`
           id,
@@ -18,45 +16,48 @@ const reportsController = {
           classes:class_id (semester, section)
         `);
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Failed to fetch allocation statistics: ${error.message}`);
+      }
 
-      // Calculate statistics
-      const stats = {
-        total_allocations: allocations.length,
+      const allocationStatistics = {
+        total_allocations: allAllocations.length,
         by_department: {},
         by_faculty: {},
         by_semester: {},
         course_distribution: {},
       };
 
-      allocations.forEach(allocation => {
-        // Department stats
-        const dept = allocation.faculty?.departments?.name || 'Unknown';
-        stats.by_department[dept] = (stats.by_department[dept] || 0) + 1;
+      allAllocations.forEach(allocation => {
+        const departmentName = allocation.faculty?.departments?.name || 'Unknown';
+        const currentDepartmentCount = allocationStatistics.by_department[departmentName] || 0;
+        allocationStatistics.by_department[departmentName] = currentDepartmentCount + 1;
 
-        // Faculty stats
-        const faculty = allocation.faculty?.name || 'Unknown';
-        stats.by_faculty[faculty] = (stats.by_faculty[faculty] || 0) + 1;
+        const facultyName = allocation.faculty?.name || 'Unknown';
+        const currentFacultyCount = allocationStatistics.by_faculty[facultyName] || 0;
+        allocationStatistics.by_faculty[facultyName] = currentFacultyCount + 1;
 
-        // Semester stats
-        const semester = allocation.classes?.semester || 'Unknown';
-        stats.by_semester[semester] = (stats.by_semester[semester] || 0) + 1;
+        const semesterName = allocation.classes?.semester || 'Unknown';
+        const currentSemesterCount = allocationStatistics.by_semester[semesterName] || 0;
+        allocationStatistics.by_semester[semesterName] = currentSemesterCount + 1;
 
-        // Course stats
-        const course = allocation.courses?.name || 'Unknown';
-        stats.course_distribution[course] = (stats.course_distribution[course] || 0) + 1;
+        const courseName = allocation.courses?.name || 'Unknown';
+        const currentCourseCount = allocationStatistics.course_distribution[courseName] || 0;
+        allocationStatistics.course_distribution[courseName] = currentCourseCount + 1;
       });
 
-      res.json(stats);
+      res.json(allocationStatistics);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to generate allocation statistics',
+        details: err.message 
+      });
     }
   },
 
-  // Get faculty workload report
   getFacultyWorkload: async (req, res) => {
     try {
-      const { data: faculty, error: facultyError } = await supabase
+      const { data: allFaculty, error: facultyError } = await supabase
         .from('faculty')
         .select(`
           id,
@@ -65,12 +66,14 @@ const reportsController = {
           departments (name)
         `);
 
-      if (facultyError) throw facultyError;
+      if (facultyError) {
+        throw new Error(`Failed to fetch faculty members: ${facultyError.message}`);
+      }
 
-      const workloadData = [];
+      const facultyWorkloadReports = [];
 
-      for (const f of faculty) {
-        const { data: allocations, error: allocError } = await supabase
+      for (const facultyMember of allFaculty) {
+        const { data: facultyAllocations, error: allocError } = await supabase
           .from('allocations')
           .select(`
             id,
@@ -79,94 +82,117 @@ const reportsController = {
               credits
             )
           `)
-          .eq('faculty_id', f.id);
+          .eq('faculty_id', facultyMember.id);
 
-        if (allocError) throw allocError;
+        if (allocError) {
+          throw new Error(`Failed to fetch allocations for faculty ${facultyMember.id}: ${allocError.message}`);
+        }
 
-        const total_courses = allocations.length;
-        const total_credits = allocations.reduce((sum, a) => sum + (a.courses?.credits || 0), 0);
-        const courses = allocations.map(a => a.courses?.name).filter(Boolean);
+        const totalAssignedCourses = facultyAllocations.length;
+        const totalCreditHours = facultyAllocations.reduce(
+          (accumulatedCredits, allocation) => accumulatedCredits + (allocation.courses?.credits || 0), 
+          0
+        );
+        const assignedCourseNames = facultyAllocations
+          .map(allocation => allocation.courses?.name)
+          .filter(courseName => courseName !== null && courseName !== undefined);
 
-        workloadData.push({
-          id: f.id,
-          faculty_name: f.name,
-          designation: f.designation,
-          department_name: f.departments?.name,
-          total_courses,
-          total_credits,
-          courses
+        facultyWorkloadReports.push({
+          id: facultyMember.id,
+          faculty_name: facultyMember.name,
+          designation: facultyMember.designation,
+          department_name: facultyMember.departments?.name,
+          total_courses: totalAssignedCourses,
+          total_credits: totalCreditHours,
+          courses: assignedCourseNames
         });
       }
 
-      res.json(workloadData);
+      res.json(facultyWorkloadReports);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to generate faculty workload report',
+        details: err.message 
+      });
     }
   },
 
-  // Get department-wise allocation report
   getDepartmentReport: async (req, res) => {
     try {
-      const { data: departments, error: deptError } = await supabase
+      const { data: allDepartments, error: deptError } = await supabase
         .from('departments')
         .select('id, name');
 
-      if (deptError) throw deptError;
+      if (deptError) {
+        throw new Error(`Failed to fetch departments: ${deptError.message}`);
+      }
 
-      const reportData = [];
+      const departmentReports = [];
 
-      for (const dept of departments) {
-        const { data: faculty, error: facError } = await supabase
+      for (const department of allDepartments) {
+        const { data: departmentFaculty, error: facError } = await supabase
           .from('faculty')
           .select('id')
-          .eq('department_id', dept.id);
+          .eq('department_id', department.id);
 
-        if (facError) throw facError;
-
-        const { data: courses, error: courseError } = await supabase
-          .from('courses')
-          .select('id')
-          .eq('department_id', dept.id);
-
-        if (courseError) throw courseError;
-
-        const facultyIds = faculty.map(f => f.id);
-        
-        let total_allocations = 0;
-        if (facultyIds.length > 0) {
-          const { count, error: allocError } = await supabase
-            .from('allocations')
-            .select('id', { count: 'exact', head: true })
-            .in('faculty_id', facultyIds);
-
-          if (allocError) throw allocError;
-          total_allocations = count || 0;
+        if (facError) {
+          throw new Error(`Failed to fetch faculty for department ${department.id}: ${facError.message}`);
         }
 
-        const avg_courses_per_faculty = faculty.length > 0 
-          ? (total_allocations / faculty.length).toFixed(2) 
+        const { data: departmentCourses, error: courseError } = await supabase
+          .from('courses')
+          .select('id')
+          .eq('department_id', department.id);
+
+        if (courseError) {
+          throw new Error(`Failed to fetch courses for department ${department.id}: ${courseError.message}`);
+        }
+
+        const facultyIdList = departmentFaculty.map(facultyMember => facultyMember.id);
+        
+        let totalDepartmentAllocations = 0;
+        const hasFacultyMembers = facultyIdList.length > 0;
+        
+        if (hasFacultyMembers) {
+          const { count: allocationCount, error: allocError } = await supabase
+            .from('allocations')
+            .select('id', { count: 'exact', head: true })
+            .in('faculty_id', facultyIdList);
+
+          if (allocError) {
+            throw new Error(`Failed to count allocations for department ${department.id}: ${allocError.message}`);
+          }
+          
+          totalDepartmentAllocations = allocationCount || 0;
+        }
+
+        const facultyCount = departmentFaculty.length;
+        const averageCoursesPerFaculty = facultyCount > 0 
+          ? (totalDepartmentAllocations / facultyCount).toFixed(2) 
           : '0.00';
 
-        reportData.push({
-          id: dept.id,
-          department_name: dept.name,
-          total_faculty: faculty.length,
-          total_courses: courses.length,
-          total_allocations,
-          avg_courses_per_faculty: parseFloat(avg_courses_per_faculty)
+        departmentReports.push({
+          id: department.id,
+          department_name: department.name,
+          total_faculty: facultyCount,
+          total_courses: departmentCourses.length,
+          total_allocations: totalDepartmentAllocations,
+          avg_courses_per_faculty: parseFloat(averageCoursesPerFaculty)
         });
       }
 
-      res.json(reportData);
+      res.json(departmentReports);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to generate department report',
+        details: err.message 
+      });
     }
   },
 
-  // Get course allocation report
   getCourseReport: async (req, res) => {
     try {
-      const { data: courses, error: courseError } = await supabase
+      const { data: allCourses, error: courseError } = await supabase
         .from('courses')
         .select(`
           id,
@@ -177,12 +203,14 @@ const reportsController = {
           departments (name)
         `);
 
-      if (courseError) throw courseError;
+      if (courseError) {
+        throw new Error(`Failed to fetch courses: ${courseError.message}`);
+      }
 
-      const reportData = [];
+      const courseAllocationReports = [];
 
-      for (const course of courses) {
-        const { data: allocations, error: allocError } = await supabase
+      for (const course of allCourses) {
+        const { data: courseAllocations, error: allocError } = await supabase
           .from('allocations')
           .select(`
             id,
@@ -190,26 +218,35 @@ const reportsController = {
           `)
           .eq('course_id', course.id);
 
-        if (allocError) throw allocError;
+        if (allocError) {
+          throw new Error(`Failed to fetch allocations for course ${course.id}: ${allocError.message}`);
+        }
 
-        const uniqueFaculty = [...new Set(allocations.map(a => a.faculty?.name).filter(Boolean))];
+        const facultyNamesList = courseAllocations
+          .map(allocation => allocation.faculty?.name)
+          .filter(facultyName => facultyName !== null && facultyName !== undefined);
+          
+        const uniqueFacultyNames = [...new Set(facultyNamesList)];
 
-        reportData.push({
+        courseAllocationReports.push({
           id: course.id,
           code: course.code,
           course_name: course.name,
           semester: course.semester,
           credits: course.credits,
           department_name: course.departments?.name,
-          total_allocations: allocations.length,
-          unique_faculty_count: uniqueFaculty.length,
-          faculty_assigned: uniqueFaculty
+          total_allocations: courseAllocations.length,
+          unique_faculty_count: uniqueFacultyNames.length,
+          faculty_assigned: uniqueFacultyNames
         });
       }
 
-      res.json(reportData);
+      res.json(courseAllocationReports);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to generate course allocation report',
+        details: err.message 
+      });
     }
   }
 };
