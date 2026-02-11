@@ -1,0 +1,38 @@
+# Vercel deployment files
+.vercel
+
+# Logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build outputs (frontend)
+frontend/dist/
+frontend/build/
+
+# Environment variables (never commit these)
+.env
+.env.local
+.env.production
+backend/.env
+frontend/.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Archive folder
+archive/
+
+# Local development files
+START.bat
+start-servers.ps1
+start.js
+verify-startup.js
+test-start.bat
