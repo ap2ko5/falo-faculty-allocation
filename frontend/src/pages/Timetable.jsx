@@ -95,12 +95,9 @@ export default function Timetable({ user }) {
       console.log('Faculty data:', facultyData);
       console.log('Class data:', classData);
       
-      // Filter out admin users from faculty list (they don't have timetables)
       const nonAdminFaculty = (facultyData || []).filter(f => f.role !== 'admin');
-      // Sort faculty alphabetically by name
       const sortedFaculty = nonAdminFaculty.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       
-      // Sort classes by display_name
       const sortedClasses = (classData || []).sort((a, b) => {
         const nameA = a.display_name || a.name || '';
         const nameB = b.display_name || b.name || '';
@@ -110,7 +107,6 @@ export default function Timetable({ user }) {
       setFaculties(sortedFaculty);
       setClasses(sortedClasses);
 
-      // Auto-select for non-admin faculty users
       if (!isAdmin && user?.id && viewType === 'faculty') {
         setSelectedId(user.id);
       }
@@ -148,7 +144,6 @@ export default function Timetable({ user }) {
         message: `Timetables generated successfully! Created ${result.timetable_entries_created || 0} entries for ${result.allocations_processed || 0} allocations.`,
         severity: 'success'
       });
-      // Refresh timetable if one is selected
       if (selectedId) {
         await fetchTimetable();
       }
@@ -224,16 +219,17 @@ export default function Timetable({ user }) {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, alignItems: 'center' }}>
-        <Box>
-          <Typography variant="h4" component="h1" className="page-title">
-            <ScheduleIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Timetable Viewer
-          </Typography>
-          <Typography variant="body2" className="page-subtitle muted">
-            View auto-generated class schedules
-          </Typography>
-        </Box>
+      <Box sx={{ mb: 3, textAlign: 'center' }}>
+        <Typography variant="h4" component="h1" className="page-title" gutterBottom>
+          <ScheduleIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
+          Timetable Viewer
+        </Typography>
+        <Typography variant="body2" className="page-subtitle muted">
+          View auto-generated class schedules
+        </Typography>
+      </Box>
+      
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
         {isAdmin && (
           <Button
             variant="contained"

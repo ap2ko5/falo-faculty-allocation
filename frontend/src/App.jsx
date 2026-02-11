@@ -5,13 +5,11 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import { theme } from './theme';
 import './App.css';
 
-// Components
 import Navbar from './components/Navbar';
 import AdminDashboard from './components/admin/AdminDashboard';
 import FacultyDashboard from './components/faculty/FacultyDashboard';
 import WindowsManager from './components/admin/WindowsManager';
 
-// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Allocations from './pages/Allocations';
@@ -70,7 +68,6 @@ function App() {
     !!localStorage.getItem('token')
   );
   const [user, setUser] = useState(() => {
-    // Try to load user from localStorage on initial load
     const savedUser = localStorage.getItem('user');
     return savedUser ? JSON.parse(savedUser) : null;
   });
@@ -78,7 +75,6 @@ function App() {
   const handleLogin = (userData) => {
     setUser(userData);
     setIsLoggedIn(true);
-    // Save user data to localStorage
     localStorage.setItem('user', JSON.stringify(userData));
   };
 

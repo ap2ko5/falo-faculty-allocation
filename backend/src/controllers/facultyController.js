@@ -1,11 +1,15 @@
 import { supabase } from '../config/database.js';
 import bcrypt from 'bcrypt';
 
+const FACULTY_CONFIG = {
+  PASSWORD_SALT_ROUNDS: 10,
+  DEFAULT_ROLE: 'faculty'
+};
+
 const facultyController = {
-  // Get all faculty
   getAll: async (req, res) => {
     try {
-      const { data, error } = await supabase
+      const { data: allFaculty, error } = await supabase
         .from('faculty')
         .select(`
           id,
@@ -21,23 +25,29 @@ const facultyController = {
           )
         `);
       
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Failed to fetch faculty: ${error.message}`);
+      }
       
-      const formatted = data.map(f => ({
-        ...f,
-        department_name: f.departments?.name
+      const formattedFacultyList = allFaculty.map(facultyMember => ({
+        ...facultyMember,
+        department_name: facultyMember.departments?.name
       }));
       
-      res.json(formatted);
+      res.json(formattedFacultyList);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to retrieve faculty members',
+        details: err.message 
+      });
     }
   },
 
-  // Get faculty by ID
   getById: async (req, res) => {
     try {
-      const { data: faculty, error } = await supabase
+      const facultyId = req.params.id;
+      
+      const { data: facultyMember, error } = await supabase
         .from('faculty')
         .select(`
           id,
@@ -52,87 +62,122 @@ const facultyController = {
             name
           )
         `)
-        .eq('id', req.params.id)
+        .eq('id', facultyId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Failed to fetch faculty member: ${error.message}`);
+      }
 
-      if (!faculty) {
-        return res.status(404).json({ error: 'Faculty not found' });
+      const facultyNotFound = facultyMember === null;
+      
+      if (facultyNotFound) {
+        return res.status(404).json({ 
+          error: 'Faculty member not found',
+          details: `No faculty member exists with ID ${facultyId}`,
+          hint: 'Please verify the faculty ID and try again'
+        });
       }
 
       res.json({
-        ...faculty,
-        department_name: faculty.departments?.name
+        ...facultyMember,
+        department_name: facultyMember.departments?.name
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to retrieve faculty member',
+        details: err.message 
+      });
     }
   },
 
-  // Create new faculty
   create: async (req, res) => {
     try {
       const { username, password, name, department_id, role, designation, expertise, preferences } = req.body;
       
-      // Check if username already exists (stored in email column)
       const { data: existingUser, error: checkError } = await supabase
         .from('faculty')
         .select('id')
         .eq('email', username)
         .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') throw checkError;
-
-      if (existingUser) {
-        return res.status(400).json({ error: 'Username already registered' });
+      const isNotFoundError = checkError?.code === 'PGRST116';
+      
+      if (checkError && !isNotFoundError) {
+        throw new Error(`Failed to check existing faculty: ${checkError.message}`);
       }
 
-      // Hash password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      const usernameAlreadyTaken = existingUser !== null;
+      
+      if (usernameAlreadyTaken) {
+        return res.status(400).json({ 
+          error: 'Username unavailable',
+          details: 'This username is already registered',
+          hint: 'Please choose a different username'
+        });
+      }
 
-      const { data, error } = await supabase
+      const hashedPassword = await bcrypt.hash(password, FACULTY_CONFIG.PASSWORD_SALT_ROUNDS);
+
+      const newFacultyData = {
+        email: username,
+        password: hashedPassword,
+        name: name || username,
+        department_id,
+        role: role || FACULTY_CONFIG.DEFAULT_ROLE,
+        designation,
+        expertise,
+        preferences
+      };
+
+      const { data: createdFaculty, error: insertError } = await supabase
         .from('faculty')
-        .insert([{
-          email: username,
-          password: hashedPassword,
-          name: name || username,
-          department_id,
-          role: role || 'faculty',
-          designation,
-          expertise,
-          preferences
-        }])
+        .insert([newFacultyData])
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertError) {
+        throw new Error(`Failed to create faculty member: ${insertError.message}`);
+      }
 
-      res.status(201).json(data);
+      res.status(201).json(createdFaculty);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Faculty creation failed',
+        details: err.message 
+      });
     }
   },
 
-  // Update faculty
   update: async (req, res) => {
     try {
+      const facultyId = req.params.id;
       const { username, password, name, department_id, role, designation, expertise, preferences } = req.body;
 
-      // Check if updating username to one that already exists (stored in email column)
-      if (username) {
+      const isUpdatingUsername = username !== undefined;
+      
+      if (isUpdatingUsername) {
         const { data: existingUser, error: checkError } = await supabase
           .from('faculty')
           .select('id')
           .eq('email', username)
-          .neq('id', req.params.id)
+          .neq('id', facultyId)
           .maybeSingle();
 
-        if (checkError && checkError.code !== 'PGRST116') throw checkError;
+        const isNotFoundError = checkError?.code === 'PGRST116';
+        
+        if (checkError && !isNotFoundError) {
+          throw new Error(`Failed to check username availability: ${checkError.message}`);
+        }
 
-        if (existingUser) {
-          return res.status(400).json({ error: 'Username already in use' });
+        const usernameInUse = existingUser !== null;
+        
+        if (usernameInUse) {
+          return res.status(400).json({ 
+            error: 'Username unavailable',
+            details: 'This username is already taken by another faculty member',
+            hint: 'Please choose a different username'
+          });
         }
       }
 
@@ -145,71 +190,104 @@ const facultyController = {
       if (expertise !== undefined) updateData.expertise = expertise;
       if (preferences !== undefined) updateData.preferences = preferences;
       
-      // Hash password if provided
-      if (password) {
-        const saltRounds = 10;
-        updateData.password = await bcrypt.hash(password, saltRounds);
+      const isUpdatingPassword = password !== undefined && password !== '';
+      
+      if (isUpdatingPassword) {
+        updateData.password = await bcrypt.hash(password, FACULTY_CONFIG.PASSWORD_SALT_ROUNDS);
       }
 
-      const { data, error } = await supabase
+      const { data: updatedFaculty, error: updateError } = await supabase
         .from('faculty')
         .update(updateData)
-        .eq('id', req.params.id)
+        .eq('id', facultyId)
         .select()
         .single();
 
-      if (error) throw error;
-
-      if (!data) {
-        return res.status(404).json({ error: 'Faculty not found' });
+      if (updateError) {
+        throw new Error(`Failed to update faculty member: ${updateError.message}`);
       }
 
-      res.json(data);
+      const facultyNotFound = updatedFaculty === null;
+      
+      if (facultyNotFound) {
+        return res.status(404).json({ 
+          error: 'Faculty member not found',
+          details: `No faculty member exists with ID ${facultyId}`,
+          hint: 'Please verify the faculty ID and try again'
+        });
+      }
+
+      res.json(updatedFaculty);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Faculty update failed',
+        details: err.message 
+      });
     }
   },
 
-  // Delete faculty
   delete: async (req, res) => {
     try {
-      const { data, error } = await supabase
+      const facultyId = req.params.id;
+      
+      const { data: deletedFaculty, error } = await supabase
         .from('faculty')
         .delete()
-        .eq('id', req.params.id)
+        .eq('id', facultyId)
         .select('id')
         .single();
 
-      if (error) throw error;
-
-      if (!data) {
-        return res.status(404).json({ error: 'Faculty not found' });
+      if (error) {
+        throw new Error(`Failed to delete faculty member: ${error.message}`);
       }
 
-      res.json({ message: 'Faculty deleted successfully' });
+      const facultyNotFound = deletedFaculty === null;
+      
+      if (facultyNotFound) {
+        return res.status(404).json({ 
+          error: 'Faculty member not found',
+          details: `No faculty member exists with ID ${facultyId}`,
+          hint: 'The faculty member may have already been deleted'
+        });
+      }
+
+      res.json({ 
+        message: 'Faculty member deleted successfully',
+        deletedId: deletedFaculty.id
+      });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Faculty deletion failed',
+        details: err.message 
+      });
     }
   },
 
-  // Get faculty workload
   getWorkload: async (req, res) => {
     try {
-      // Get faculty details
-      const { data: faculty, error: facultyError } = await supabase
+      const facultyId = req.params.id;
+      
+      const { data: facultyMember, error: facultyError } = await supabase
         .from('faculty')
         .select('id, name, designation')
-        .eq('id', req.params.id)
+        .eq('id', facultyId)
         .maybeSingle();
 
-      if (facultyError) throw facultyError;
-
-      if (!faculty) {
-        return res.status(404).json({ error: 'Faculty not found' });
+      if (facultyError) {
+        throw new Error(`Failed to fetch faculty member: ${facultyError.message}`);
       }
 
-      // Get allocations for this faculty
-      const { data: allocations, error: allocError } = await supabase
+      const facultyNotFound = facultyMember === null;
+      
+      if (facultyNotFound) {
+        return res.status(404).json({ 
+          error: 'Faculty member not found',
+          details: `No faculty member exists with ID ${facultyId}`,
+          hint: 'Please verify the faculty ID and try again'
+        });
+      }
+
+      const { data: courseAllocations, error: allocError } = await supabase
         .from('allocations')
         .select(`
           id,
@@ -217,22 +295,30 @@ const facultyController = {
             credits
           )
         `)
-        .eq('faculty_id', req.params.id);
+        .eq('faculty_id', facultyId);
 
-      if (allocError) throw allocError;
+      if (allocError) {
+        throw new Error(`Failed to fetch course allocations: ${allocError.message}`);
+      }
 
-      const total_courses = allocations.length;
-      const total_credits = allocations.reduce((sum, a) => sum + (a.courses?.credits || 0), 0);
+      const totalAssignedCourses = courseAllocations.length;
+      const totalCreditHours = courseAllocations.reduce(
+        (accumulatedCredits, allocation) => accumulatedCredits + (allocation.courses?.credits || 0), 
+        0
+      );
 
       res.json({
-        id: faculty.id,
-        name: faculty.name,
-        designation: faculty.designation,
-        total_courses,
-        total_credits
+        id: facultyMember.id,
+        name: facultyMember.name,
+        designation: facultyMember.designation,
+        total_courses: totalAssignedCourses,
+        total_credits: totalCreditHours
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to calculate faculty workload',
+        details: err.message 
+      });
     }
   }
 };

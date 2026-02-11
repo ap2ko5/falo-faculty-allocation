@@ -4,10 +4,8 @@ import { supabase } from '../config/database.js';
 
 const router = express.Router();
 
-// Protected routes
 router.use(verifyToken);
 
-// Get all departments
 router.get('/', async (req, res) => {
   try {
     const { data, error } = await supabase

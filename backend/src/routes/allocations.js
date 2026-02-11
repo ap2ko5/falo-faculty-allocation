@@ -6,10 +6,8 @@ import { createAllocationSchema, autoAllocateSchema } from '../schemas/validatio
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(verifyToken);
 
-// Faculty and admin routes - anyone can view and create (faculty creates with status='pending')
 router.get('/', allocationController.getAll);
 router.get('/windows', allocationController.getWindows);
 router.post('/',
@@ -17,7 +15,6 @@ router.post('/',
   allocationController.create
 );
 
-// Admin only routes
 router.use(isAdmin);
 
 router.put('/:id/approve',

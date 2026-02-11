@@ -6,7 +6,6 @@ import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Public routes
 router.post('/login',
   validateBody(loginSchema),
   authController.login
@@ -17,7 +16,6 @@ router.post('/register',
   authController.register
 );
 
-// Protected routes
 router.get('/profile',
   verifyToken,
   authController.profile

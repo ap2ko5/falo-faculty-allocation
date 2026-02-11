@@ -91,7 +91,6 @@ export default function Navbar({ isLoggedIn, onLogout, user }) {
     </Box>
   );
 
-  // Sidebar menu items based on user role
   const getMenuItems = () => {
     if (!isLoggedIn) {
       return [
@@ -112,7 +111,6 @@ export default function Navbar({ isLoggedIn, onLogout, user }) {
       ];
     }
 
-    // Faculty menu
     return [
       { text: 'Dashboard', icon: <DashboardIcon />, action: () => navigate('/dashboard') },
       { text: 'Courses', icon: <SchoolIcon />, action: () => navigate('/courses') },

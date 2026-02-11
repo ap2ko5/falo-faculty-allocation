@@ -47,11 +47,9 @@ export default function Faculty() {
       headerName: 'Department', 
       width: 180,
       valueGetter: (params) => {
-        // Check if row exists and has department data
         if (!params.row) {
           return 'N/A';
         }
-        // Use department_name field added by backend, or nested departments.name
         return params.row.department_name || params.row.departments?.name || 'N/A';
       }
     },
@@ -107,7 +105,6 @@ export default function Faculty() {
         departmentService.getAll(),
       ]);
       setFaculty(facultyData);
-      // Sort departments alphabetically
       const sortedDepts = (deptData || []).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setDepartments(sortedDepts);
     } catch (err) {
@@ -143,7 +140,6 @@ export default function Faculty() {
         role: formData.role,
       };
 
-      // Only include password if it's provided
       if (formData.password) {
         submitData.password = formData.password;
       }
@@ -193,10 +189,11 @@ export default function Faculty() {
 
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Typography variant="h4" component="h1" align="center" gutterBottom sx={{ mb: 3 }}>
+        Faculty Management
+      </Typography>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Faculty Management
-        </Typography>
+        <Box sx={{ flex: 1 }} />
         <Button
           variant="contained"
           startIcon={<AddIcon />}

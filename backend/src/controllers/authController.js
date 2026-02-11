@@ -3,13 +3,19 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { config } from '../config/database.js';
 
+const AUTH_CONFIG = {
+  PASSWORD_SALT_ROUNDS: 10,
+  TOKEN_EXPIRY: '24h',
+  DEFAULT_DEPARTMENT_ID: 1,
+  DEFAULT_ROLE: 'faculty'
+};
+
 const authController = {
   login: async (req, res) => {
     try {
       const { username, password } = req.body;
       
-      // Get faculty details with department name (username maps to email in DB)
-      const { data: faculty, error } = await supabase
+      const { data: userAccount, error } = await supabase
         .from('faculty')
         .select(`
           id,
@@ -28,42 +34,57 @@ const authController = {
         .eq('email', username)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Database query failed: ${error.message}`);
+      }
       
-      if (!faculty) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+      const userExists = userAccount !== null;
+      
+      if (!userExists) {
+        return res.status(401).json({ 
+          error: 'Login failed',
+          details: 'Username or password is incorrect',
+          hint: 'Please check your credentials and try again'
+        });
       }
 
-      // Compare hashed password
-      const match = await bcrypt.compare(password, faculty.password);
-      if (!match) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+      const passwordMatches = await bcrypt.compare(password, userAccount.password);
+      
+      if (!passwordMatches) {
+        return res.status(401).json({ 
+          error: 'Login failed',
+          details: 'Username or password is incorrect',
+          hint: 'Please check your credentials and try again'
+        });
       }
       
-      const token = jwt.sign(
+      const authToken = jwt.sign(
         { 
-          userId: faculty.id,
-          email: faculty.email,
-          role: faculty.role,
-          department: faculty.department_id
+          userId: userAccount.id,
+          email: userAccount.email,
+          role: userAccount.role,
+          department: userAccount.department_id
         },
         config.jwtSecret,
-        { expiresIn: '24h' }
+        { expiresIn: AUTH_CONFIG.TOKEN_EXPIRY }
       );
 
       return res.json({
-        token,
+        token: authToken,
         user: {
-          id: faculty.id,
-          email: faculty.email,
-          role: faculty.role,
-          department: faculty.department_id,
-          departmentName: faculty.departments?.name,
-          name: faculty.name
+          id: userAccount.id,
+          email: userAccount.email,
+          role: userAccount.role,
+          department: userAccount.department_id,
+          departmentName: userAccount.departments?.name,
+          name: userAccount.name
         }
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Login error',
+        details: err.message 
+      });
     }
   },
 
@@ -71,64 +92,77 @@ const authController = {
     try {
       const { username, password, role, name, department_id, designation, expertise, preferences } = req.body;
       
-      // Check if username already exists (username maps to email column)
       const { data: existingUser, error: checkError } = await supabase
         .from('faculty')
         .select('id')
         .eq('email', username)
         .maybeSingle();
 
-      if (checkError && checkError.code !== 'PGRST116') throw checkError;
-
-      if (existingUser) {
-        return res.status(400).json({ error: 'Username already registered' });
+      const isNotFoundError = checkError?.code === 'PGRST116';
+      
+      if (checkError && !isNotFoundError) {
+        throw new Error(`Failed to check existing user: ${checkError.message}`);
       }
 
-      // Hash password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(password, saltRounds);
+      const usernameAlreadyTaken = existingUser !== null;
+      
+      if (usernameAlreadyTaken) {
+        return res.status(400).json({ 
+          error: 'Username unavailable',
+          details: 'This username is already registered',
+          hint: 'Please choose a different username or try logging in'
+        });
+      }
 
-      // Insert new faculty (username goes into email column)
-      const { data: faculty, error } = await supabase
+      const hashedPassword = await bcrypt.hash(password, AUTH_CONFIG.PASSWORD_SALT_ROUNDS);
+
+      const newUserData = {
+        email: username,
+        password: hashedPassword,
+        role: role || AUTH_CONFIG.DEFAULT_ROLE,
+        name: name || username,
+        department_id: department_id || AUTH_CONFIG.DEFAULT_DEPARTMENT_ID,
+        designation,
+        expertise,
+        preferences
+      };
+
+      const { data: createdUser, error: insertError } = await supabase
         .from('faculty')
-        .insert([{
-          email: username,
-          password: hashedPassword,
-          role: role || 'faculty',
-          name: name || username,
-          department_id: department_id || 1,
-          designation,
-          expertise,
-          preferences
-        }])
+        .insert([newUserData])
         .select()
         .single();
 
-      if (error) throw error;
+      if (insertError) {
+        throw new Error(`Failed to create user account: ${insertError.message}`);
+      }
       
-      const token = jwt.sign(
+      const authToken = jwt.sign(
         { 
-          userId: faculty.id,
-          email: faculty.email,
-          role: faculty.role,
-          department: faculty.department_id
+          userId: createdUser.id,
+          email: createdUser.email,
+          role: createdUser.role,
+          department: createdUser.department_id
         },
         config.jwtSecret,
-        { expiresIn: '24h' }
+        { expiresIn: AUTH_CONFIG.TOKEN_EXPIRY }
       );
 
       res.json({
-        token,
+        token: authToken,
         user: {
-          id: faculty.id,
-          email: faculty.email,
-          role: faculty.role,
-          department: faculty.department_id,
-          name: faculty.name
+          id: createdUser.id,
+          email: createdUser.email,
+          role: createdUser.role,
+          department: createdUser.department_id,
+          name: createdUser.name
         }
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Registration failed',
+        details: err.message 
+      });
     }
   },
 
@@ -136,7 +170,7 @@ const authController = {
     try {
       const { userId } = req.user;
       
-      const { data: faculty, error } = await supabase
+      const { data: userProfile, error } = await supabase
         .from('faculty')
         .select(`
           id,
@@ -154,25 +188,36 @@ const authController = {
         .eq('id', userId)
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Failed to fetch user profile: ${error.message}`);
+      }
 
-      if (!faculty) {
-        return res.status(404).json({ error: 'User not found' });
+      const profileNotFound = userProfile === null;
+      
+      if (profileNotFound) {
+        return res.status(404).json({ 
+          error: 'Profile not found',
+          details: 'Your user account could not be located',
+          hint: 'Please try logging in again'
+        });
       }
 
       res.json({
-        id: faculty.id,
-        email: faculty.email,
-        role: faculty.role,
-        department: faculty.department_id,
-        departmentName: faculty.departments?.name,
-        name: faculty.name,
-        designation: faculty.designation,
-        expertise: faculty.expertise,
-        preferences: faculty.preferences
+        id: userProfile.id,
+        email: userProfile.email,
+        role: userProfile.role,
+        department: userProfile.department_id,
+        departmentName: userProfile.departments?.name,
+        name: userProfile.name,
+        designation: userProfile.designation,
+        expertise: userProfile.expertise,
+        preferences: userProfile.preferences
       });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to load profile',
+        details: err.message 
+      });
     }
   }
 };

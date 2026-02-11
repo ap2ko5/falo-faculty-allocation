@@ -1,70 +1,71 @@
 import { supabase } from '../config/database.js';
 
-/**
- * Generate timetable entries for allocations
- * Distributes classes across Monday-Friday, 8 time slots per day
- * Avoids conflicts: same faculty/class can't be in multiple places at once
- */
+const TIMETABLE_CONFIG = {
+  WORKING_DAYS_PER_WEEK: 5,
+  TIME_SLOTS_PER_DAY: 8,
+  TOTAL_WEEKLY_SLOTS: 40,
+  ROOM_NUMBER_START: 100
+};
+
 async function generateTimetable(allocations, classes) {
   const timetableEntries = [];
+  const occupiedFacultySlots = new Set();
+  const occupiedClassSlots = new Set();
+  const roomAssignmentCounter = {};
+  const { WORKING_DAYS_PER_WEEK, TIME_SLOTS_PER_DAY } = TIMETABLE_CONFIG;
   
-  // Track occupied slots: key = "faculty_id-day-slot" or "class_id-day-slot"
-  const facultySlots = new Set();
-  const classSlots = new Set();
-  const roomCounter = {}; // Track room assignments per day/slot
-  
-  // Time slots: 1-8 (e.g., 9:00 AM - 4:00 PM with 1-hour slots)
-  const TIME_SLOTS = 8;
-  const DAYS = 5; // Monday to Friday
-  
-  // Helper to find next available slot for a faculty-class pair
   const findAvailableSlot = (facultyId, classId) => {
-    for (let day = 1; day <= DAYS; day++) {
-      for (let slot = 1; slot <= TIME_SLOTS; slot++) {
-        const facultyKey = `${facultyId}-${day}-${slot}`;
-        const classKey = `${classId}-${day}-${slot}`;
+    for (let dayOfWeek = 1; dayOfWeek <= WORKING_DAYS_PER_WEEK; dayOfWeek++) {
+      for (let timeSlot = 1; timeSlot <= TIME_SLOTS_PER_DAY; timeSlot++) {
+        const facultySlotKey = `${facultyId}-${dayOfWeek}-${timeSlot}`;
+        const classSlotKey = `${classId}-${dayOfWeek}-${timeSlot}`;
         
-        // Check if both faculty and class are free at this slot
-        if (!facultySlots.has(facultyKey) && !classSlots.has(classKey)) {
-          return { day, slot };
+        const isFacultyAvailable = !occupiedFacultySlots.has(facultySlotKey);
+        const isClassAvailable = !occupiedClassSlots.has(classSlotKey);
+        
+        if (isFacultyAvailable && isClassAvailable) {
+          return { day: dayOfWeek, slot: timeSlot };
         }
       }
     }
-    return null; // No slot available (overbooked)
+    return null;
   };
   
-  // Helper to generate room number
-  const getRoomNumber = (day, slot, classId) => {
-    const key = `${day}-${slot}`;
-    if (!roomCounter[key]) roomCounter[key] = 0;
-    roomCounter[key]++;
+  const generateRoomNumber = (dayOfWeek, timeSlot, classId) => {
+    const slotKey = `${dayOfWeek}-${timeSlot}`;
+    if (!roomAssignmentCounter[slotKey]) {
+      roomAssignmentCounter[slotKey] = 0;
+    }
+    roomAssignmentCounter[slotKey]++;
     
-    // Use class department info if available
-    const cls = classes.find(c => c.id === classId);
-    const prefix = cls?.department_id ? `D${cls.department_id}` : 'R';
-    return `${prefix}${100 + roomCounter[key]}`;
+    const classInfo = classes.find(c => c.id === classId);
+    const departmentPrefix = classInfo?.department_id ? `D${classInfo.department_id}` : 'R';
+    const roomNumber = TIMETABLE_CONFIG.ROOM_NUMBER_START + roomAssignmentCounter[slotKey];
+    
+    return `${departmentPrefix}${roomNumber}`;
   };
   
-  // Process each allocation
   for (const allocation of allocations) {
-    const slot = findAvailableSlot(allocation.faculty_id, allocation.class_id);
+    const availableSlot = findAvailableSlot(allocation.faculty_id, allocation.class_id);
     
-    if (slot) {
-      const { day, slot: timeSlot } = slot;
-      const roomNumber = getRoomNumber(day, timeSlot, allocation.class_id);
+    if (availableSlot) {
+      const { day, slot: timeSlot } = availableSlot;
+      const assignedRoomNumber = generateRoomNumber(day, timeSlot, allocation.class_id);
       
       timetableEntries.push({
         allocation_id: allocation.id,
         day_of_week: day,
         time_slot: timeSlot,
-        room_number: roomNumber
+        room_number: assignedRoomNumber
       });
       
-      // Mark slots as occupied
-      facultySlots.add(`${allocation.faculty_id}-${day}-${timeSlot}`);
-      classSlots.add(`${allocation.class_id}-${day}-${timeSlot}`);
+      const facultySlotKey = `${allocation.faculty_id}-${day}-${timeSlot}`;
+      const classSlotKey = `${allocation.class_id}-${day}-${timeSlot}`;
+      
+      occupiedFacultySlots.add(facultySlotKey);
+      occupiedClassSlots.add(classSlotKey);
     } else {
-      console.warn(`Warning: Could not find available slot for allocation ${allocation.id}`);
+      console.warn(`Unable to schedule allocation ${allocation.id}: No available time slots. The weekly schedule (${TIMETABLE_CONFIG.TOTAL_WEEKLY_SLOTS} slots) may be full.`);
     }
   }
   
@@ -74,7 +75,6 @@ async function generateTimetable(allocations, classes) {
 const allocationController = {
   getAll: async (req, res) => {
     try {
-      // Fetch all data in parallel
       const fetchClasses = async () => {
         const result = { data: null, error: null, warnings: [] };
         const options = {
@@ -153,7 +153,6 @@ const allocationController = {
         classesResult.warnings.forEach((warning) => console.warn(warning));
       }
 
-      // Check for errors
       if (allocationsResult.error) {
         console.error('Error fetching allocations:', allocationsResult.error);
         throw allocationsResult.error;
@@ -162,7 +161,6 @@ const allocationController = {
       if (coursesResult.error) console.error('Error fetching courses:', coursesResult.error);
       if (classesResult.error) console.error('Error fetching classes:', classesResult.error);
 
-      // Create lookup maps for efficient joining
       const facultyMap = new Map((facultyResult.data || []).map(f => [f.id, f]));
       const courseMap = new Map((coursesResult.data || []).map(c => [c.id, c]));
       const normalizeClass = (cl) => {
@@ -182,7 +180,6 @@ const allocationController = {
 
       const classMap = new Map((classesResult.data || []).map(cl => [cl.id, normalizeClass(cl)]));
 
-      // Join data manually
       const enrichedAllocations = (allocationsResult.data || []).map(allocation => ({
         ...allocation,
         faculty: facultyMap.get(allocation.faculty_id) || null,
@@ -201,6 +198,40 @@ const allocationController = {
   create: async (req, res) => {
     try {
       const { faculty_id, class_id, course_id, academic_year, semester, status } = req.body;
+
+      const hasRequiredFields = faculty_id && class_id && course_id && academic_year && semester;
+      
+      if (!hasRequiredFields) {
+        return res.status(400).json({ 
+          error: 'Missing required information',
+          details: 'Please provide faculty, class, course, academic year, and semester',
+          hint: 'All fields are required to create an allocation'
+        });
+      }
+
+      const { data: existingAllocations, error: existingError } = await supabase
+        .from('allocations')
+        .select('id, status')
+        .eq('class_id', class_id)
+        .eq('course_id', course_id)
+        .eq('academic_year', academic_year)
+        .eq('semester', semester)
+        .limit(1);
+
+      if (existingError) {
+        console.error('Error checking for duplicate allocation:', existingError);
+        throw existingError;
+      }
+
+      const allocationAlreadyExists = existingAllocations?.length > 0;
+      
+      if (allocationAlreadyExists) {
+        return res.status(409).json({ 
+          error: 'Duplicate allocation detected',
+          details: 'This class already has an allocation for this course in the selected academic term',
+          hint: 'Please check existing allocations or choose a different class/course combination'
+        });
+      }
       
       const { data, error } = await supabase
         .from('allocations')
@@ -210,7 +241,7 @@ const allocationController = {
           course_id, 
           academic_year, 
           semester,
-          status: status || 'approved' // Default to approved if not specified
+          status: status || 'approved'
         }])
         .select()
         .single();
@@ -256,15 +287,24 @@ const allocationController = {
 
   delete: async (req, res) => {
     try {
+      const allocationId = req.params.id;
+      
       const { error } = await supabase
         .from('allocations')
         .delete()
-        .eq('id', req.params.id);
+        .eq('id', allocationId);
       
       if (error) throw error;
-      res.json({ message: 'Allocation deleted successfully' });
+      
+      res.json({ 
+        message: 'Allocation successfully removed',
+        details: 'The faculty-course assignment has been deleted along with any associated timetable entries'
+      });
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ 
+        error: 'Failed to delete allocation',
+        details: err.message 
+      });
     }
   },
 
@@ -272,8 +312,14 @@ const allocationController = {
     try {
       const { academic_year, semester } = req.body;
       
-      if (!academic_year || !semester) {
-        return res.status(400).json({ error: 'Academic year and semester are required' });
+      const hasRequiredParameters = academic_year && semester;
+      
+      if (!hasRequiredParameters) {
+        return res.status(400).json({ 
+          error: 'Missing required parameters',
+          details: 'Both academic year and semester are required for auto-allocation',
+          hint: 'Example: academic_year: 2024, semester: 5'
+        });
       }
 
       console.log(`Starting auto-allocation for ${academic_year} Semester ${semester}`);
@@ -290,150 +336,156 @@ const allocationController = {
       if (coursesResult.error) throw coursesResult.error;
       if (classesResult.error) throw classesResult.error;
 
-      const faculty = facultyResult.data || [];
-      const courses = coursesResult.data || [];
-      const classes = classesResult.data || [];
-      const existing = existingAllocations.data || [];
+      const availableFaculty = facultyResult.data || [];
+      const semesterCourses = coursesResult.data || [];
+      const semesterClasses = classesResult.data || [];
+      const existingAllocationsList = existingAllocations.data || [];
 
-      console.log(`Found: ${faculty.length} faculty, ${courses.length} courses, ${classes.length} classes`);
-      console.log(`Existing allocations: ${existing.length}`);
+      console.log(`Auto-allocation data summary: ${availableFaculty.length} faculty members, ${semesterCourses.length} courses, ${semesterClasses.length} classes`);
+      console.log(`Found ${existingAllocationsList.length} existing allocations for this term`);
 
-      // Step 2: Filter out already allocated combinations
-      const allocatedKey = (f, cl, co) => `${f}-${cl}-${co}`;
-      const existingKeys = new Set(existing.map(a => allocatedKey(a.faculty_id, a.class_id, a.course_id)));
+      const createAllocationKey = (facultyId, classId, courseId) => `${facultyId}-${classId}-${courseId}`;
+      const existingAllocationKeys = new Set(
+        existingAllocationsList.map(allocation => 
+          createAllocationKey(allocation.faculty_id, allocation.class_id, allocation.course_id)
+        )
+      );
 
-      // Step 3: Group courses by department
-      const coursesByDept = {};
-      courses.forEach(course => {
-        if (!coursesByDept[course.department_id]) {
-          coursesByDept[course.department_id] = [];
+      const coursesByDepartment = {};
+      semesterCourses.forEach(course => {
+        const departmentId = course.department_id;
+        if (!coursesByDepartment[departmentId]) {
+          coursesByDepartment[departmentId] = [];
         }
-        coursesByDept[course.department_id].push(course);
+        coursesByDepartment[departmentId].push(course);
       });
 
-      // Step 4: Group classes by department
-      const classesByDept = {};
-      classes.forEach(cls => {
-        if (!classesByDept[cls.department_id]) {
-          classesByDept[cls.department_id] = [];
+      const classesByDepartment = {};
+      semesterClasses.forEach(classInfo => {
+        const departmentId = classInfo.department_id;
+        if (!classesByDepartment[departmentId]) {
+          classesByDepartment[departmentId] = [];
         }
-        classesByDept[cls.department_id].push(cls);
+        classesByDepartment[departmentId].push(classInfo);
       });
 
-      // Step 5: Group faculty by department
-      const facultyByDept = {};
-      faculty.forEach(f => {
-        if (!facultyByDept[f.department_id]) {
-          facultyByDept[f.department_id] = [];
+      const facultyByDepartment = {};
+      availableFaculty.forEach(facultyMember => {
+        const departmentId = facultyMember.department_id;
+        if (!facultyByDepartment[departmentId]) {
+          facultyByDepartment[departmentId] = [];
         }
-        facultyByDept[f.department_id].push(f);
+        facultyByDepartment[departmentId].push(facultyMember);
       });
 
-      // Step 6: Create allocations
-      const newAllocations = [];
+      const pendingAllocations = [];
 
-      // For each department
-      Object.keys(coursesByDept).forEach(deptId => {
-        const deptCourses = coursesByDept[deptId];
-        const deptClasses = classesByDept[deptId] || [];
-        const deptFaculty = facultyByDept[deptId] || [];
+      Object.keys(coursesByDepartment).forEach(departmentId => {
+        const departmentCourses = coursesByDepartment[departmentId];
+        const departmentClasses = classesByDepartment[departmentId] || [];
+        const departmentFaculty = facultyByDepartment[departmentId] || [];
 
-        if (deptFaculty.length === 0) {
-          console.log(`No faculty available for department ${deptId}`);
+        const hasFacultyAvailable = departmentFaculty.length > 0;
+        
+        if (!hasFacultyAvailable) {
+          console.log(`Warning: No faculty members available for department ${departmentId}. Skipping allocations for this department.`);
           return;
         }
 
-        let facultyIndex = 0;
+        let facultyRotationIndex = 0;
 
-        // For each class in this department
-        deptClasses.forEach(cls => {
-          // For each course in this department
-          deptCourses.forEach(course => {
-            // Round-robin faculty assignment
-            const assignedFaculty = deptFaculty[facultyIndex % deptFaculty.length];
-            facultyIndex++;
+        departmentClasses.forEach(classInfo => {
+          departmentCourses.forEach(course => {
+            const assignedFaculty = departmentFaculty[facultyRotationIndex % departmentFaculty.length];
+            facultyRotationIndex++;
 
-            const key = allocatedKey(assignedFaculty.id, cls.id, course.id);
+            const allocationKey = createAllocationKey(assignedFaculty.id, classInfo.id, course.id);
+            const isAlreadyAllocated = existingAllocationKeys.has(allocationKey);
             
-            // Skip if already allocated
-            if (existingKeys.has(key)) {
-              console.log(`Skipping: Faculty ${assignedFaculty.id} already assigned to Class ${cls.id} Course ${course.id}`);
+            if (isAlreadyAllocated) {
+              console.log(`Skipping duplicate: Faculty ${assignedFaculty.id} already assigned to Class ${classInfo.id} for Course ${course.id}`);
               return;
             }
 
-            // Check expertise match (optional, prioritize but don't require)
-            const hasExpertise = !course.required_expertise || 
-                                course.required_expertise.length === 0 ||
-                                (assignedFaculty.expertise && 
-                                 course.required_expertise.some(req => 
-                                   assignedFaculty.expertise.some(exp => 
-                                     exp.toLowerCase().includes(req.toLowerCase()) ||
-                                     req.toLowerCase().includes(exp.toLowerCase())
-                                   )
-                                 ));
+            const courseHasNoRequirements = !course.required_expertise || course.required_expertise.length === 0;
+            const facultyHasExpertise = assignedFaculty.expertise && 
+              course.required_expertise?.some(requiredSkill => 
+                assignedFaculty.expertise.some(facultySkill => {
+                  const skillLower = facultySkill.toLowerCase();
+                  const requiredLower = requiredSkill.toLowerCase();
+                  return skillLower.includes(requiredLower) || requiredLower.includes(skillLower);
+                })
+              );
+            
+            const expertiseMatches = courseHasNoRequirements || facultyHasExpertise;
+            const allocationStatus = expertiseMatches ? 'approved' : 'pending';
 
-            newAllocations.push({
+            pendingAllocations.push({
               faculty_id: assignedFaculty.id,
-              class_id: cls.id,
+              class_id: classInfo.id,
               course_id: course.id,
               academic_year,
               semester,
-              status: hasExpertise ? 'approved' : 'pending' // Auto-approve if expertise matches
+              status: allocationStatus
             });
           });
         });
       });
 
-      console.log(`Created ${newAllocations.length} new allocations`);
+      console.log(`Generated ${pendingAllocations.length} new allocations for processing`);
 
-      // Step 7: Insert allocations
-      if (newAllocations.length > 0) {
+      const hasAllocationsToCreate = pendingAllocations.length > 0;
+
+      if (hasAllocationsToCreate) {
         const { data: insertedAllocations, error: insertError } = await supabase
           .from('allocations')
-          .insert(newAllocations)
+          .insert(pendingAllocations)
           .select();
 
         if (insertError) {
-          console.error('Error inserting allocations:', insertError);
-          throw insertError;
+          console.error('Failed to save allocations to database:', insertError);
+          throw new Error(`Database error: ${insertError.message}`);
         }
 
-        console.log(`Successfully inserted ${insertedAllocations.length} allocations`);
+        console.log(`Successfully saved ${insertedAllocations.length} allocations to database`);
 
-        // Step 8: Create timetable entries ONLY for faculty allocations (exclude admin)
-        // Filter out allocations where faculty role is 'admin'
-        const facultyAllocations = insertedAllocations.filter(allocation => {
-          const facultyMember = faculty.find(f => f.id === allocation.faculty_id);
-          return facultyMember && facultyMember.role === 'faculty';
+        const facultyOnlyAllocations = insertedAllocations.filter(allocation => {
+          const facultyMember = availableFaculty.find(f => f.id === allocation.faculty_id);
+          const isFacultyRole = facultyMember && facultyMember.role === 'faculty';
+          return isFacultyRole;
         });
 
-        console.log(`Creating timetables for ${facultyAllocations.length} faculty allocations (excluding admin)`);
+        console.log(`Generating timetables for ${facultyOnlyAllocations.length} faculty allocations (admin users excluded)`);
 
-        const timetableEntries = await generateTimetable(facultyAllocations, classes);
+        const generatedTimetableEntries = await generateTimetable(facultyOnlyAllocations, semesterClasses);
         
-        if (timetableEntries.length > 0) {
+        let timetableCount = 0;
+        
+        if (generatedTimetableEntries.length > 0) {
           const { data: insertedTimetable, error: timetableError } = await supabase
             .from('timetable')
-            .insert(timetableEntries)
+            .insert(generatedTimetableEntries)
             .select();
 
           if (timetableError) {
-            console.error('Error inserting timetable:', timetableError);
-            // Don't throw - allocations are more important than timetable
+            console.error('Failed to save timetable entries:', timetableError);
           } else {
-            console.log(`Successfully created ${insertedTimetable.length} timetable entries for faculty only`);
+            timetableCount = insertedTimetable.length;
+            console.log(`Successfully created ${timetableCount} timetable entries`);
           }
         }
 
         res.json({
           message: 'Auto-allocation completed successfully',
+          summary: `Created ${insertedAllocations.length} allocations and ${timetableCount} timetable entries`,
           allocations_created: insertedAllocations.length,
-          timetable_entries_created: timetableEntries.length,
+          timetable_entries_created: timetableCount,
           allocations: insertedAllocations
         });
       } else {
         res.json({
-          message: 'No new allocations needed - all courses already allocated',
+          message: 'No new allocations needed',
+          details: 'All available course-class combinations are already allocated for this term',
           allocations_created: 0
         });
       }
@@ -445,11 +497,9 @@ const allocationController = {
 
   getWindows: async (req, res) => {
     try {
-      // Since we don't have a separate AllocationWindow table in PostgreSQL
-      // we can modify this to return the current academic year and semester
       const currentYear = new Date().getFullYear();
       const currentMonth = new Date().getMonth();
-      const semester = currentMonth >= 6 ? 2 : 1; // Second semester starts in July
+      const semester = currentMonth >= 6 ? 2 : 1;
 
       res.json([{
         academic_year: currentYear,

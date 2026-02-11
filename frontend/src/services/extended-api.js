@@ -1,4 +1,3 @@
-// Add services for faculty, courses, classes, departments
 export const facultyService = {
   getAll: async () => {
     const response = await fetch(`${API_URL}/faculty`, {

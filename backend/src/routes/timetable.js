@@ -4,10 +4,8 @@ import { supabase } from '../config/database.js';
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(verifyToken);
 
-// Get timetable for a specific class
 router.get('/class/:classId', async (req, res) => {
   try {
     const { classId } = req.params;
@@ -36,7 +34,6 @@ router.get('/class/:classId', async (req, res) => {
   }
 });
 
-// Get timetable for a specific faculty
 router.get('/faculty/:facultyId', async (req, res) => {
   try {
     const { facultyId } = req.params;
@@ -65,7 +62,6 @@ router.get('/faculty/:facultyId', async (req, res) => {
   }
 });
 
-// Get all timetable entries
 router.get('/', async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -93,7 +89,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get timetable statistics
 router.get('/stats', async (req, res) => {
   try {
     const [timetableCount, slotUtilization] = await Promise.all([
@@ -122,7 +117,6 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// Generate timetables for all allocations (admin only)
 router.post('/generate', async (req, res) => {
   try {
     const { academic_year, semester } = req.body;
@@ -131,7 +125,6 @@ router.post('/generate', async (req, res) => {
       return res.status(400).json({ error: 'Academic year and semester are required' });
     }
 
-    // Fetch allocations for the specified academic year and semester
     const { data: allocations, error: allocError } = await supabase
       .from('allocations')
       .select(`
@@ -145,7 +138,6 @@ router.post('/generate', async (req, res) => {
 
     if (allocError) throw allocError;
 
-    // Filter only faculty members (exclude admins)
     const facultyAllocations = (allocations || []).filter(a => a.faculty?.role === 'faculty');
 
     if (facultyAllocations.length === 0) {
@@ -155,40 +147,34 @@ router.post('/generate', async (req, res) => {
       });
     }
 
-    // Delete existing timetable entries for this period to avoid duplicates
     const allocationIds = facultyAllocations.map(a => a.id);
     await supabase
       .from('timetable')
       .delete()
       .in('allocation_id', allocationIds);
 
-    // Generate timetable entries
     const timetableEntries = [];
     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-    const SLOTS = 8; // 9 AM to 5 PM
+    const SLOTS = 8;
 
-    const occupiedSlots = new Set(); // Track occupied slots: "faculty_id-day-slot" or "class_id-day-slot"
+    const occupiedSlots = new Set();
 
     for (const allocation of facultyAllocations) {
       let assigned = false;
       
-      // Try to find an available slot
       for (let day = 0; day < DAYS.length && !assigned; day++) {
         for (let slot = 0; slot < SLOTS && !assigned; slot++) {
           const facultyKey = `${allocation.faculty_id}-${day}-${slot}`;
           const classKey = `${allocation.class_id}-${day}-${slot}`;
           
-          // Check if both faculty and class are free at this slot
           if (!occupiedSlots.has(facultyKey) && !occupiedSlots.has(classKey)) {
-            // Assign this slot
             timetableEntries.push({
               allocation_id: allocation.id,
               day_of_week: day,
               time_slot: slot,
-              room_number: `D${allocation.class.department_id}${Math.floor(Math.random() * 100) + 101}` // Room naming
+              room_number: `D${allocation.class.department_id}${Math.floor(Math.random() * 100) + 101}`
             });
             
-            // Mark slots as occupied
             occupiedSlots.add(facultyKey);
             occupiedSlots.add(classKey);
             assigned = true;
@@ -201,7 +187,6 @@ router.post('/generate', async (req, res) => {
       }
     }
 
-    // Insert timetable entries
     if (timetableEntries.length > 0) {
       const { data: insertedTimetable, error: insertError } = await supabase
         .from('timetable')

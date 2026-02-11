@@ -2,34 +2,53 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 export const authService = {
   login: async (credentials) => {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const loginResponse = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
     });
-    if (!response.ok) throw new Error('Login failed');
-    return response.json();
+    
+    const loginSuccessful = loginResponse.ok;
+    
+    if (!loginSuccessful) {
+      const errorDetails = await loginResponse.json().catch(() => ({}));
+      const errorMessage = errorDetails.details || errorDetails.error || 'Login failed. Please check your credentials.';
+      throw new Error(errorMessage);
+    }
+    
+    return loginResponse.json();
   },
 
   register: async (userData) => {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const registrationResponse = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
     });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Registration failed: ${response.status}`);
+    
+    const registrationSuccessful = registrationResponse.ok;
+    
+    if (!registrationSuccessful) {
+      const errorDetails = await registrationResponse.json().catch(() => ({}));
+      const errorMessage = errorDetails.details || errorDetails.error || `Registration failed with status ${registrationResponse.status}`;
+      throw new Error(errorMessage);
     }
-    return response.json();
+    
+    return registrationResponse.json();
   },
 
   logout: async () => {
-    const response = await fetch(`${API_URL}/auth/logout`, {
+    const logoutResponse = await fetch(`${API_URL}/auth/logout`, {
       method: 'POST',
     });
-    if (!response.ok) throw new Error('Logout failed');
-    return response.json();
+    
+    const logoutSuccessful = logoutResponse.ok;
+    
+    if (!logoutSuccessful) {
+      throw new Error('Logout failed. Please try again.');
+    }
+    
+    return logoutResponse.json();
   },
 };
 
@@ -51,7 +70,10 @@ export const allocationService = {
       },
       body: JSON.stringify(allocationData),
     });
-    if (!response.ok) throw new Error('Failed to create allocation');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to create allocation');
+    }
     return response.json();
   },
 

@@ -6,15 +6,12 @@ import { createFacultySchema, updateFacultySchema } from '../schemas/validation.
 
 const router = express.Router();
 
-// Protected routes
 router.use(verifyToken);
 
-// Routes accessible to all authenticated users
 router.get('/', facultyController.getAll);
 router.get('/:id', facultyController.getById);
 router.get('/:id/workload', facultyController.getWorkload);
 
-// Admin only routes
 router.post('/', 
   isAdmin,
   validateBody(createFacultySchema),
