@@ -41,7 +41,9 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5051;
-app.listen(PORT, () => {
+const HOST = '0.0.0.0'; // Bind to all interfaces for Railway/Docker
+
+app.listen(PORT, HOST, () => {
   console.log(`🚀 FALO Backend running on port ${PORT}`);
   console.log(`📡 API: http://localhost:${PORT}/api`);
 });
